@@ -1,10 +1,10 @@
 import moment from 'moment-timezone'
 import os from 'os'
 
-const NEW_DAYS = 30 // 🆕 auto-hides itself after this many days
-const STATUS_CACHE_MS = 5 * 60 * 1000 // 5 min cache for status checks
+const NEW_DAYS = 30 // 🆕 كيختافي من بعد هاد عدد الايام
+const STATUS_CACHE_MS = 5 * 60 * 1000 // 5 دقايق كاش
 
-// Bold Unicode converter — works natively in WhatsApp, no image/library needed
+// تحويل للحروف الغليظة باش تبان زوينة فالواتساب
 function toBoldUnicode(str) {
         const bold = {
                 a:'𝐚',b:'𝐛',c:'𝐜',d:'𝐝',e:'𝐞',f:'𝐟',g:'𝐠',h:'𝐡',i:'𝐢',j:'𝐣',
@@ -18,15 +18,32 @@ function toBoldUnicode(str) {
         return str.split('').map(c => bold[c] || c).join('')
 }
 
-// color dot per category — quick visual scanning
+// الالوان ديال الاقسام
 const categoryColors = {
         main: '🔵', ai: '🟣', downloader: '🟢', uploader: '🟢',
         editor: '🟠', sticker: '🟡', tools: '⚪', infobot: '🔵',
         group: '🟢', owner: '🔴',
 }
 
-// ---------------- i18n ----------------
+// ---------------- الترجمة بالدارجة ----------------
 const translations = {
+        ar: { // خليتها "ar" باش تبقى متوافقة مع.lang ar
+                prefix: 'العلامة', uptime: 'الوقت ديال الخدمة', ram: 'الذاكرة', status: 'الحالة',
+                commands: 'الاوامر', plugins: 'البلاگنات', users: 'المستخدمين', views: 'عدد المرات تحل المنيو',
+                tapMenu: '✦ ضغط على 📂 لائحة الاوامر لتحت باش تبدل القسم',
+                notFound: 'هاد القسم مكاينش، غادي نوريك المنيو كامل.', empty: '(خاوي)',
+                whatsNew: 'الجديد', newDesc: 'اوامر تزادو فهاد', days: 'يوم',
+                noNew: '(مكاين حتى امر جديد دابا)',
+                tips: [
+                        '💡 نصيحة: كتب.menu <القسم> باش تدخل نيشان للقسم.',
+                        '💡 نصيحة: 🆕 حدا الامر كيعني تزاد مؤخرا.',
+                        '💡 نصيحة: 🔥 كيعني هاد الامر مستعمل بزاف.',
+                        '💡 نصيحة: 🔒 كيعني عندو عدد محدود ديال الاستعمال.',
+                        '💡 نصيحة: 💎 كيعني خاصو بريميوم.',
+                        '💡 نصيحة: كتب.menu new باش تشوف الجديد كامل.',
+                        '💡 نصيحة: كتب.lang ar|fr|en باش تبدل اللغة.',
+                ],
+        },
         en: {
                 prefix: 'Prefix', uptime: 'Uptime', ram: 'RAM', status: 'Status',
                 commands: 'Commands', plugins: 'Plugins', users: 'Users', views: 'Menu Views',
@@ -35,30 +52,13 @@ const translations = {
                 whatsNew: "What's New", newDesc: 'Commands added in the last', days: 'days',
                 noNew: '(no new commands right now)',
                 tips: [
-                        '💡 Tip: type .menu <category> to jump straight to a section.',
+                        '💡 Tip: type.menu <category> to jump straight to a section.',
                         '💡 Tip: 🆕 next to a command means it was added recently.',
                         '💡 Tip: 🔥 marks the most used commands right now.',
                         '💡 Tip: 🔒 means the command has a usage limit.',
                         '💡 Tip: 💎 means the command is premium-only.',
-                        '💡 Tip: type .menu new to see everything added recently.',
-                        '💡 Tip: type .lang ar|fr|en to change the menu language.',
-                ],
-        },
-        ar: {
-                prefix: 'البادئة', uptime: 'مدة التشغيل', ram: 'الذاكرة', status: 'الحالة',
-                commands: 'الأوامر', plugins: 'الإضافات', users: 'المستخدمون', views: 'مشاهدات المنيو',
-                tapMenu: '✦ اضغط 📂 قائمة الأوامر بالأسفل للتنقل بين الأقسام',
-                notFound: 'القسم غير موجود، سيتم عرض القائمة الكاملة.', empty: '(فارغ)',
-                whatsNew: 'الجديد', newDesc: 'أوامر تمت إضافتها في آخر', days: 'يوم',
-                noNew: '(لا يوجد أوامر جديدة حاليا)',
-                tips: [
-                        '💡 نصيحة: اكتب .menu <القسم> للوصول مباشرة لقسم معين.',
-                        '💡 نصيحة: 🆕 جانب الأمر تعني أنه أضيف مؤخرا.',
-                        '💡 نصيحة: 🔥 تعني أن هذا الأمر من الأكثر استعمالا.',
-                        '💡 نصيحة: 🔒 تعني أن الأمر له حد استعمال محدود.',
-                        '💡 نصيحة: 💎 تعني أن الأمر خاص بالمستخدمين المميزين.',
-                        '💡 نصيحة: اكتب .menu new لرؤية كل الأوامر المضافة مؤخرا.',
-                        '💡 نصيحة: اكتب .lang ar|fr|en لتغيير لغة القائمة.',
+                        '💡 Tip: type.menu new to see everything added recently.',
+                        '💡 Tip: type.lang ar|fr|en to change the menu language.',
                 ],
         },
         fr: {
@@ -69,46 +69,46 @@ const translations = {
                 whatsNew: 'Nouveautés', newDesc: 'Commandes ajoutées ces derniers', days: 'jours',
                 noNew: '(aucune nouvelle commande pour le moment)',
                 tips: [
-                        '💡 Astuce : tapez .menu <catégorie> pour accéder directement à une section.',
+                        '💡 Astuce : tapez.menu <catégorie> pour accéder directement à une section.',
                         '💡 Astuce : 🆕 signifie que la commande a été ajoutée récemment.',
                         '💡 Astuce : 🔥 marque les commandes les plus utilisées.',
                         "💡 Astuce : 🔒 signifie que la commande a une limite d'utilisation.",
                         '💡 Astuce : 💎 signifie que la commande est réservée aux membres premium.',
-                        '💡 Astuce : tapez .menu new pour voir tout ce qui a été ajouté récemment.',
-                        '💡 Astuce : tapez .lang ar|fr|en pour changer la langue du menu.',
+                        '💡 Astuce : tapez.menu new pour voir tout ce qui a été ajouté récemment.',
+                        '💡 Astuce : tapez.lang ar|fr|en pour changer la langue du menu.',
                 ],
         },
 }
 
 function t(lang, key) {
-        const dict = translations[lang] || translations.en
-        return dict[key] !== undefined ? dict[key] : translations.en[key]
+        const dict = translations[lang] || translations.ar // دابا الافتراضي هو العربية
+        return dict[key]!== undefined? dict[key] : translations.ar[key]
 }
 
 const handler = async (m, { conn, usedPrefix: _p, command, isOwner, args }) => {
 
         const allTags = {
-                main: { title: 'Main Menu', emoji: '🏠' },
-                ai: { title: 'AI Menu', emoji: '🤖' },
-                downloader: { title: 'Downloader Menu', emoji: '📥' },
-                uploader: { title: 'Uploader Menu', emoji: '📤' },
-                editor: { title: 'Editor Menu', emoji: '🎨' },
-                sticker: { title: 'Sticker Menu', emoji: '🎟' },
-                tools: { title: 'Tools Menu', emoji: '🛠' },
-                infobot: { title: 'Info Menu', emoji: 'ℹ️' },
-                group: { title: 'Group Menu', emoji: '👥' },
-                owner: { title: 'Owner Menu', emoji: '👑' },
+                main: { title: 'القائمة الرئيسية', emoji: '🏠' },
+                ai: { title: 'قائمة الذكاء الاصطناعي', emoji: '🤖' },
+                downloader: { title: 'قائمة التحميل', emoji: '📥' },
+                uploader: { title: 'قائمة الرفع', emoji: '📤' },
+                editor: { title: 'قائمة التعديل', emoji: '🎨' },
+                sticker: { title: 'قائمة الملصقات', emoji: '🎟' },
+                tools: { title: 'قائمة الادوات', emoji: '🛠' },
+                infobot: { title: 'قائمة المعلومات', emoji: 'ℹ️' },
+                group: { title: 'قائمة المجموعات', emoji: '👥' },
+                owner: { title: 'قائمة المالك', emoji: '👑' },
         }
 
         let teks = (args[0] || '').toLowerCase()
         const showNewOnly = teks === 'new'
-        let invalidCategory = teks && !showNewOnly && !Object.keys(allTags).includes(teks)
+        let invalidCategory = teks &&!showNewOnly &&!Object.keys(allTags).includes(teks)
         let tags = {}
 
-        if (showNewOnly || !Object.keys(allTags).includes(teks)) teks = 'all'
+        if (showNewOnly ||!Object.keys(allTags).includes(teks)) teks = 'all'
 
         tags = teks === 'all'
-                ? { ...allTags }
+               ? {...allTags }
                 : { [teks]: allTags[teks] }
 
         if (!isOwner) delete tags.owner
@@ -121,15 +121,15 @@ const handler = async (m, { conn, usedPrefix: _p, command, isOwner, args }) => {
 
                 global.db.data.users[m.sender] = global.db.data.users[m.sender] || {}
                 let user = global.db.data.users[m.sender]
-                const lang = ['ar', 'fr', 'en'].includes(user.lang) ? user.lang : 'en'
+                const lang = ['ar', 'fr', 'en'].includes(user.lang)? user.lang : 'ar' // الافتراضي عربية
 
                 const defaultMenu = {
                         before: `
 ╭━━━⪩ ${toBoldUnicode(conn.user.name)} ⪨━━━⬣
-┃ 👋 ${ucapan()}, %name
-┃ 🔧 ${t(lang, 'prefix')}: %prefix   ✨ v%version
+┃ 👋 ${ucapan()}، %name
+┃ 🔧 ${t(lang, 'prefix')}: %prefix ✨ النسخة %version
 ┃
-┃ 📅 %week, %date
+┃ 📅 %week، %date
 ┃ ⏱ ${t(lang, 'uptime')}: %uptime
 ┃ 💾 ${t(lang, 'ram')}: %ram
 ┃ 📡 ${t(lang, 'status')}: %status
@@ -159,24 +159,22 @@ const handler = async (m, { conn, usedPrefix: _p, command, isOwner, args }) => {
                 const isFirstBoot = Object.keys(firstSeenMap).length === 0
 
                 const help = Object.entries(global.plugins)
-                        .filter(([_, p]) => !p.disabled)
-                        .map(([filename, p]) => {
+                       .filter(([_, p]) =>!p.disabled)
+                       .map(([filename, p]) => {
                                 if (!(filename in firstSeenMap)) {
-                                        firstSeenMap[filename] = isFirstBoot ? now - (NEW_DAYS + 1) * 86400000 : now
+                                        firstSeenMap[filename] = isFirstBoot? now - (NEW_DAYS + 1) * 86400000 : now
                                 }
-
                                 const isNewBool = now - firstSeenMap[filename] < NEW_DAYS * 86400000
-
                                 return {
-                                        help: Array.isArray(p.help) ? p.help : [p.help],
-                                        tags: Array.isArray(p.tags) ? p.tags : [p.tags],
+                                        help: Array.isArray(p.help)? p.help : [p.help],
+                                        tags: Array.isArray(p.tags)? p.tags : [p.tags],
                                         prefix: 'customPrefix' in p,
-                                        limit: p.limit ? '🔒' : '',
-                                        premium: p.premium ? '💎' : '',
-                                        owner: p.owner ? '🄾' : '',
-                                        isNew: isNewBool ? '🆕' : '',
+                                        limit: p.limit? '🔒' : '',
+                                        premium: p.premium? '💎' : '',
+                                        owner: p.owner? '🄾' : '',
+                                        isNew: isNewBool? '🆕' : '',
                                         isNewBool,
-                                        popular: p.popular ? '🔥' : '',
+                                        popular: p.popular? '🔥' : '',
                                 }
                         })
 
@@ -190,17 +188,17 @@ const handler = async (m, { conn, usedPrefix: _p, command, isOwner, args }) => {
                 const maxCount = Math.max(...countsByTag, 1)
 
                 const rows = [
-                        ...Object.keys(allTags).map(tag => {
+                       ...Object.keys(allTags).map(tag => {
                                 const count = help.filter(p => p.tags.includes(tag)).reduce((a, p) => a + p.help.length, 0)
                                 return {
                                         title: `${allTags[tag].emoji} ${allTags[tag].title}`,
-                                        description: `${count} command${count === 1 ? '' : 's'}`,
+                                        description: `${count} امر`,
                                         id: `${_p + command} ${tag}`,
                                 }
                         }),
                         {
                                 title: `🆕 ${t(lang, 'whatsNew')}`,
-                                description: `${totalNew} command${totalNew === 1 ? '' : 's'}`,
+                                description: `${totalNew} امر`,
                                 id: `${_p + command} new`,
                         },
                 ]
@@ -211,81 +209,70 @@ const handler = async (m, { conn, usedPrefix: _p, command, isOwner, args }) => {
                         const sections = Object.keys(allTags).map(tag => {
                                 const filtered = help.filter(p => p.tags.includes(tag))
                                 const list = []
-
                                 for (const p of filtered) {
                                         for (const h of p.help) {
                                                 if (!p.isNewBool) continue
-                                                const cmd = p.prefix ? h : `${_p}${h}`
+                                                const cmd = p.prefix? h : `${_p}${h}`
                                                 list.push(cmd)
                                         }
                                 }
-
                                 list.sort((a, b) => a.localeCompare(b))
-
                                 if (!list.length) return ''
-
                                 const items = list.map((cmd, i) =>
                                         defaultMenu.body
-                                                .replace(/%index/g, String(i + 1).padStart(2, '0'))
-                                                .replace(/%cmd/g, cmd)
-                                                .replace(/%flags/g, ' 🆕')
+                                               .replace(/%index/g, String(i + 1).padStart(2, '0'))
+                                               .replace(/%cmd/g, cmd)
+                                               .replace(/%flags/g, ' 🆕')
                                 )
-
                                 return `${defaultMenu.header
-                                        .replace('%emoji', allTags[tag].emoji)
-                                        .replace('%color', categoryColors[tag] || '⚪')
-                                        .replace('%category', toBoldUnicode(allTags[tag].title))
-                                        .replace('%count', list.length)
-                                        .replace('%bar', '')}\n${items.join('\n')}\n${defaultMenu.footer}`
+                                       .replace('%emoji', allTags[tag].emoji)
+                                       .replace('%color', categoryColors[tag] || '⚪')
+                                       .replace('%category', toBoldUnicode(allTags[tag].title))
+                                       .replace('%count', list.length)
+                                       .replace('%bar', '')}\n${items.join('\n')}\n${defaultMenu.footer}`
                         }).filter(Boolean)
 
                         text = [
                                 defaultMenu.newBefore,
-                                ...(sections.length ? sections : [`\n${t(lang, 'noNew')}`]),
+                               ...(sections.length? sections : [`\n${t(lang, 'noNew')}`]),
                         ].join('\n')
                 } else {
                         text = [
                                 defaultMenu.before,
-                                ...Object.keys(tags).map(tag => {
+                               ...Object.keys(tags).map(tag => {
                                         const filtered = help.filter(p => p.tags.includes(tag))
                                         const list = []
-
                                         for (const p of filtered) {
                                                 for (const h of p.help) {
-                                                        const cmd = p.prefix ? h : `${_p}${h}`
+                                                        const cmd = p.prefix? h : `${_p}${h}`
                                                         const flags = [p.isNew, p.popular, p.owner, p.premium, p.limit].filter(Boolean).join(' ')
-                                                        list.push({ cmd, flags: flags ? ` ${flags}` : '' })
+                                                        list.push({ cmd, flags: flags? ` ${flags}` : '' })
                                                 }
                                         }
-
                                         list.sort((a, b) => a.cmd.localeCompare(b.cmd))
-
                                         const items = list.map((entry, i) =>
                                                 defaultMenu.body
-                                                        .replace(/%index/g, String(i + 1).padStart(2, '0'))
-                                                        .replace(/%cmd/g, entry.cmd)
-                                                        .replace(/%flags/g, entry.flags)
+                                                       .replace(/%index/g, String(i + 1).padStart(2, '0'))
+                                                       .replace(/%cmd/g, entry.cmd)
+                                                       .replace(/%flags/g, entry.flags)
                                         )
-
                                         const count = list.length
                                         const filled = Math.max(1, Math.round((count / maxCount) * 10))
                                         const bar = '▰'.repeat(filled) + '▱'.repeat(10 - filled)
-
                                         return `${defaultMenu.header
-                                                .replace('%emoji', tags[tag].emoji)
-                                                .replace('%color', categoryColors[tag] || '⚪')
-                                                .replace('%category', toBoldUnicode(tags[tag].title))
-                                                .replace('%count', count)
-                                                .replace('%bar', bar)}\n${items.join('\n') || `│ ${t(lang, 'empty')}`}\n${defaultMenu.footer}`
+                                               .replace('%emoji', tags[tag].emoji)
+                                               .replace('%color', categoryColors[tag] || '⚪')
+                                               .replace('%category', toBoldUnicode(tags[tag].title))
+                                               .replace('%count', count)
+                                               .replace('%bar', bar)}\n${items.join('\n') || `│ ${t(lang, 'empty')}`}\n${defaultMenu.footer}`
                                 }),
-                                invalidCategory ? `\n⚠️ ${t(lang, 'notFound')}` : '',
+                                invalidCategory? `\n⚠️ ${t(lang, 'notFound')}` : '',
                                 defaultMenu.after,
                         ].filter(Boolean).join('\n')
                 }
 
                 let { registered } = user
-
-                let name = registered ? user.name : conn.getName(m.sender)
+                let name = registered? user.name : conn.getName(m.sender)
                 let uptime = clockString(process.uptime() * 1000)
                 let ram = ramUsage()
                 let status = await checkStatus()
@@ -297,7 +284,7 @@ const handler = async (m, { conn, usedPrefix: _p, command, isOwner, args }) => {
                 let views = global.db.data.stats.menuViews
 
                 let d = new Date()
-                let locale = lang === 'ar' ? 'ar-MA' : lang === 'fr' ? 'fr-FR' : 'en-US'
+                let locale = 'ar-MA' // ديما بالتاريخ المغربي
 
                 let week = d.toLocaleDateString(locale, { weekday: 'long' })
                 let date = d.toLocaleDateString(locale, {
@@ -339,12 +326,12 @@ const handler = async (m, { conn, usedPrefix: _p, command, isOwner, args }) => {
                                         new RegExp(`%(${Object.keys(replace).join('|')})`, 'g'),
                                         (_, key) => replace[key]
                                 ),
-                                footer: `${global.namebot} • ${new Date().toLocaleTimeString('en-US')}`,
+                                footer: `${global.namebot} • ${new Date().toLocaleTimeString('ar-MA')}`,
                                 buttons: [
                                         {
                                                 name: 'single_select',
                                                 buttonParamsJson: JSON.stringify({
-                                                        title: '📂 Menu List',
+                                                        title: '📂 لائحة الاوامر',
                                                         sections: [{ rows }],
                                                 }),
                                         },
@@ -358,7 +345,7 @@ const handler = async (m, { conn, usedPrefix: _p, command, isOwner, args }) => {
                                         {
                                                 name: 'quick_reply',
                                                 buttonParamsJson: JSON.stringify({
-                                                        display_text: '👑 Contact Owner',
+                                                        display_text: '👑 تواصل مع المالك',
                                                         id: _p + 'owner',
                                                 }),
                                         },
@@ -372,7 +359,7 @@ const handler = async (m, { conn, usedPrefix: _p, command, isOwner, args }) => {
         } catch (e) {
                 console.error(e)
                 await m.react('❌')
-                m.reply('Error displaying menu.')
+                m.reply('وقع خطأ فعرض المنيو.')
         }
 }
 
@@ -391,7 +378,7 @@ function clockString(ms) {
         let m = Math.floor(ms / 60000) % 60
         let s = Math.floor(ms / 1000) % 60
         let parts = [h, m, s].map(v => v.toString().padStart(2, '0')).join(':')
-        return d > 0 ? `${d}d ${parts}` : parts
+        return d > 0? `${d}يوم ${parts}` : parts
 }
 
 function ramUsage() {
@@ -401,38 +388,33 @@ function ramUsage() {
 }
 
 function ucapan() {
-        const time = moment.tz('Asia/Jakarta').format('HH')
-        if (time < 4) return 'Good Night'
-        if (time < 10) return 'Good Morning'
-        if (time < 15) return 'Good Afternoon'
-        if (time < 18) return 'Good Evening'
-        return 'Good Night'
+        const time = moment.tz('Africa/Casablanca').format('HH') // بدلتها لتوقيت المغرب
+        if (time < 4) return 'تصبح على خير'
+        if (time < 10) return 'صباح الخير'
+        if (time < 15) return 'نهارك زوين'
+        if (time < 18) return 'العشية'
+        return 'مساء الخير'
 }
 
 async function checkStatus() {
         global.db.data.stats = global.db.data.stats || {}
         const cache = global.db.data.stats.statusCache
-
         if (cache && Date.now() - cache.checkedAt < STATUS_CACHE_MS) {
                 return cache.result
         }
-
         const services = [
-                { name: 'WhatsApp', check: async () => true },
-                { name: 'Database', check: async () => !!(global.db && global.db.data) },
+                { name: 'واتساب', check: async () => true },
+                { name: 'قاعدة البيانات', check: async () =>!!(global.db && global.db.data) },
         ]
-
         const results = {}
         for (const s of services) {
                 try {
-                        results[s.name] = (await s.check()) ? '🟢' : '🔴'
+                        results[s.name] = (await s.check())? '🟢' : '🔴'
                 } catch {
                         results[s.name] = '🔴'
                 }
         }
-
         const resultText = Object.entries(results).map(([k, v]) => `${v} ${k}`).join(' | ')
-
         global.db.data.stats.statusCache = { checkedAt: Date.now(), result: resultText }
         return resultText
-													}
+			}
