@@ -1,112 +1,67 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DAMAR-MD - جيب الكود ديال الربط</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif}
-body{background:linear-gradient(135deg,#0f0f0f 0%,#1a0033 100%);color:#fff;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px}
-.container{background:#111;border:2px solid #a855f7;border-radius:20px;padding:40px 30px;max-width:500px;width:100%;box-shadow:0 0 30px rgba(168,85,247,0.3)}
-.logo{width:90px;height:90px;background:linear-gradient(135deg,#a855f7,#7c3aed);border-radius:50%;margin:0 auto 15px;display:flex;justify-content:center;align-items:center;font-size:50px}
-h1{color:#a855f7;font-size:35px;text-align:center;margin-bottom:5px;font-weight:800}
-.subtitle{text-align:center;color:#ccc;margin-bottom:25px;font-size:14px}
-.card{background:#1a1a1a;padding:25px;border-radius:15px;margin-bottom:20px}
-label{display:block;margin-bottom:8px;color:#ddd;font-weight:600}
-input,select{width:100%;padding:14px;background:#222;border:1px solid #444;color:#fff;border-radius:10px;font-size:16px;margin-bottom:15px;outline:none}
-input:focus,select:focus{border-color:#a855f7}
-.btn{width:100%;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;padding:15px;border:none;border-radius:10px;font-size:18px;font-weight:700;cursor:pointer;transition:0.3s}
-.btn:hover{transform:scale(1.02);box-shadow:0 0 20px rgba(168,85,247,0.5)}
-.btn:disabled{background:#555;cursor:not-allowed}
-.result{margin-top:20px;padding:15px;background:#0d0d0d;border:1px dashed #a855f7;border-radius:10px;text-align:center;display:none}
-.result h3{color:#a855f7;margin-bottom:10px}
-.code{font-size:24px;letter-spacing:3px;font-weight:800;color:#fff;background:#000;padding:10px;border-radius:8px}
-.error{color:#ff5555;margin-top:10px;font-size:14px}
-.footer{text-align:center;margin-top:20px;font-size:12px;color:#666}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAMAR-MD Pairing</title>
+    <style>
+        body { background: #0a0a0a; color: #fff; font-family: 'Tahoma'; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .box { background: #1a1a1a; padding: 30px; border-radius: 15px; width: 90%; max-width: 400px; text-align: center; border: 1px solid #25D366; }
+        input, select, button { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: none; background: #2a2a2a; color: #fff; font-size: 16px; }
+        button { background: #25D366; color: #000; font-weight: bold; cursor: pointer; }
+        button:disabled { background: #555; }
+        #codeBox { font-size: 24px; letter-spacing: 3px; background: #000; padding: 15px; margin-top: 15px; border-radius: 8px; color: #25D366; display: none; }
+    </style>
 </head>
 <body>
-<div class="container">
-  <div class="logo">⚡</div>
-  <h1>DAMAR-MD</h1>
-  <p class="subtitle">جيب الكود ديال الربط وربط البوت ديالك</p>
-
-  <div class="card">
-    <label for="number">📱 النمرة ديال الواتساب</label>
-    <input type="text" id="number" placeholder="مثال: 212633226499">
-
-    <label for="server">🖥️ ختار السيرفر</label>
-    <select id="server">
-      <option value="server1">السيرفر 1 - المغرب 🇲🇦</option>
-      <option value="server2">السيرفر 2 - فرنسا 🇫🇷</option>
-      <option value="server3">السيرفر 3 - ألمانيا 🇩🇪</option>
-      <option value="server4">السيرفر 4 - أمريكا 🇺🇸</option>
-      <option value="server5">السيرفر 5 - كندا 🇨🇦</option>
-    </select>
-
-    <button class="btn" onclick="generateCode()">جيب كود الربط 🔑</button>
-
-    <div class="result" id="resultBox">
-      <h3>✅ هاهو الكود ديالك</h3>
-      <div class="code" id="codeOutput">----</div>
-      <p style="font-size:12px;color:#aaa;margin-top:8px">الكود تصيفط ليك فالواتساب دابا. دخلو فـ "ربط بجهاز"</p>
+    <div class="box">
+        <h2>DAMAR-MD</h2>
+        <p>دخل النمرة ديالك بالكود ديال البلد</p>
+        <input type="text" id="number" placeholder="مثال: 212633226499" />
+        <select id="server">
+            <option value="server1">السيرفر 1</option>
+        </select>
+        <button id="getCodeBtn" onclick="getCode()">جيب كود الربط</button>
+        <div id="codeBox"></div>
+        <p style="font-size: 12px; color: #aaa;">الكود صالح 20 ثانية فقط</p>
     </div>
-    <p class="error" id="errorBox"></p>
-  </div>
 
-  <p class="footer">© 2026 Powered By DAMAR</p>
-</div>
+    <script>
+        const API_URL = 'https://damar-api-production.up.railway.app'; // رابط Railway ديالك
 
-<script>
-// صلحناه: بدلنا /pair ب /code
-const API_URL = "https://damar-api-production.up.railway.app/code" 
+        async function getCode() {
+            const number = document.getElementById('number').value;
+            const server = document.getElementById('server').value;
+            const btn = document.getElementById('getCodeBtn');
+            const codeBox = document.getElementById('codeBox');
 
-async function generateCode(){
-  const number = document.getElementById('number').value.trim();
-  const server = document.getElementById('server').value;
-  const btn = document.querySelector('.btn');
-  const errorBox = document.getElementById('errorBox');
-  errorBox.innerText = "";
-  
-  if(number.length < 10 || !number.startsWith('212')){
-    alert('دخل النمرة صحيحة ا خويا. خاص تبدا ب 212');
-    return;
-  }
+            if (!number) return alert('دخل النمرة');
 
-  btn.disabled = true;
-  btn.innerText = 'كنجيب الكود...';
-  document.getElementById('resultBox').style.display = 'none';
+            btn.disabled = true;
+            btn.innerText = 'كنجيب الكود...';
+            codeBox.style.display = 'none';
 
-  try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ number, server })
-    });
-
-    const text = await res.text(); // قريناه كـ text لول باش نعرفو واش JSON ولا HTML
-    let data;
-    try {
-        data = JSON.parse(text);
-    } catch {
-        throw new Error('السيرفر رجع خطأ. تأكد البوت خدام ف Railway');
-    }
-
-    if(!res.ok) throw new Error(data.message || 'وقع خطأ');
-
-    document.getElementById('codeOutput').innerText = data.code;
-    document.getElementById('resultBox').style.display = 'block';
-    
-    alert(`✅ الكود تصيفط للنمرة ${number} فالواتساب`);
-
-  } catch(err) {
-    errorBox.innerText = "❌ " + err.message;
-    console.error(err);
-  } finally {
-    btn.disabled = false;
-    btn.innerText = 'جيب كود الربط 🔑';
-  }
-}
-</script>
+            try {
+                const res = await fetch(`${API_URL}/code`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ number, server })
+                });
+                const data = await res.json();
+                
+                if (data.code) {
+                    codeBox.innerText = data.code;
+                    codeBox.style.display = 'block';
+                    alert('الكود: ' + data.code + '\nدخلو للواتساب دابا فـ الأجهزة المرتبطة');
+                } else {
+                    alert('خطأ: ' + data.message);
+                }
+            } catch (e) {
+                alert('خطأ في الاتصال بالسيرفر: ' + e.message);
+            }
+            btn.disabled = false;
+            btn.innerText = 'جيب كود الربط';
+        }
+    </script>
 </body>
 </html>
