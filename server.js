@@ -1,40 +1,36 @@
 import express from 'express';
 import cors from 'cors';
-import pkg from '@whiskeysockets/baileys';
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, delay } = pkg;
+import { default as makeWASocket, useMultiFileAuthState, DisconnectReason, delay } from '@whiskeysockets/baileys';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// باش الواجهة تقدر تهضر معاه
 app.use(cors());
 app.use(express.json());
 
-// دالة باش نجيبو الكود
 async function generatePairingCode(number) {
     const { state, saveCreds } = await useMultiFileAuthState('./auth');
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false
+        printQRInTerminal: false,
+        browser: ['DAMAR-MD', 'Chrome', '1.0.0']
     });
 
     sock.ev.on('creds.update', saveCreds);
 
     try {
         const code = await sock.requestPairingCode(number);
-        await delay(3000); // عطيه 3 ثواني يصيفط
+        await delay(3000);
         await sock.logout();
         await sock.end();
         return code;
     } catch (e) {
         console.error(e);
-        await sock.logout();
-        await sock.end();
+        try { await sock.logout(); await sock.end(); } catch {}
         throw new Error('مقدرناش نجيبو الكود');
     }
 }
 
-// هادي هي اللي ناقصاك
 app.post('/code', async (req, res) => {
     try {
         const { number, server } = req.body;
