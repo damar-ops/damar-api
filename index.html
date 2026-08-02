@@ -6,94 +6,81 @@
 <title>DAMAR-MD - جيب الكود ديال الربط</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif}
-body{background:linear-gradient(135deg,#0f0f0f 0%,#1a0033 100%);color:#fff;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px;overflow-x:hidden}
-.container{background:#111;border:2px solid #a855f7;border-radius:20px;padding:40px 30px;max-width:500px;width:100%;box-shadow:0 0 30px rgba(168,85,247,0.3);position:relative;animation: glow 4s infinite alternate}
+body{background:linear-gradient(135deg,#0f0f0f 0%,#1a0033 100%);color:#fff;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:10px;overflow-x:hidden}
+.container{background:#111;border:2px solid #a855f7;border-radius:15px;padding:15px 15px;max-width:360px;width:100%;box-shadow:0 0 20px rgba(168,85,247,0.3);position:relative;animation: glow 4s infinite alternate}
 @keyframes glow {
- 0%{box-shadow:0 0 20px rgba(0,150,255,0.4)}
- 33%{box-shadow:0 0 20px rgba(255,0,0,0.4)}
- 66%{box-shadow:0 0 20px rgba(0,255,0,0.4)}
- 100%{box-shadow:0 0 20px rgba(168,85,247,0.4)}
+ 0%{box-shadow:0 0 15px rgba(0,150,255,0.4)}
+ 33%{box-shadow:0 0 15px rgba(255,0,0,0.4)}
+ 66%{box-shadow:0 0 15px rgba(0,255,0,0.4)}
+ 100%{box-shadow:0 0 15px rgba(168,85,247,0.4)}
 }
 
-/* الدائرة بالصورة و الدوران اخضر ازرق */
-.logo-wrap{width:110px;height:110px;margin:0 auto 15px;position:relative;display:flex;justify-content:center;align-items:center}
+/* الدائرة مصغرة */
+.logo-wrap{width:75px;height:75px;margin:0 auto 10px;position:relative;display:flex;justify-content:center;align-items:center}
 .logo-wrap::before{
   content:"";
   position:absolute;
-  inset:-4px;
+  inset:-3px;
   border-radius:50%;
   background: conic-gradient(from 0deg, #00ff88, #00aaff, #00ff88);
   animation: spin 3s linear infinite;
   z-index:0;
 }
 .logo{
-  width:100px;height:100px;border-radius:50%;position:relative;z-index:1;
+  width:70px;height:70px;border-radius:50%;position:relative;z-index:1;
   background-image:url('https://files.catbox.moe/bxx6uh.jpg');
   background-size:cover;background-position:center;
-  border:3px solid #111;
+  border:2px solid #111;
   animation: pulse 2s infinite alternate;
 }
 @keyframes spin{ to{transform:rotate(360deg)} }
 @keyframes pulse{ from{transform:scale(1)} to{transform:scale(1.05)} }
 
-h1{color:#a855f7;font-size:35px;text-align:center;margin-bottom:5px;font-weight:800;animation: colorCycle 5s infinite}
-.subtitle{text-align:center;color:#ccc;margin-bottom:25px;font-size:14px;animation: colorCycle 5s infinite 0.5s}
+h1{color:#a855f7;font-size:24px;text-align:center;margin-bottom:3px;font-weight:800;animation: colorCycle 5s infinite}
+.subtitle{text-align:center;color:#ccc;margin-bottom:15px;font-size:12px;animation: colorCycle 5s infinite 0.5s}
 @keyframes colorCycle{
  0%{color:#00aaff} 33%{color:#ff0000} 66%{color:#00ff88} 100%{color:#a855f7}
 }
 
-.card{background:#1a1a1a;padding:25px;border-radius:15px;margin-bottom:20px;border:1px solid transparent;animation: borderColor 6s infinite}
+.card{background:#1a1a1a;padding:15px;border-radius:12px;margin-bottom:12px;border:1px solid transparent;animation: borderColor 6s infinite}
 @keyframes borderColor{
  0%{border-color:#00aaff} 33%{border-color:#ff0000} 66%{border-color:#00ff88} 100%{border-color:#a855f7}
 }
 
-label{display:block;margin-bottom:8px;color:#ddd;font-weight:600}
-input,select{width:100%;padding:14px;background:#222;border:1px solid #444;color:#fff;border-radius:10px;font-size:16px;margin-bottom:15px;outline:none;transition:0.3s}
-input:focus,select:focus{border-color:#00aaff;box-shadow:0 0 10px rgba(0,170,255,0.4)}
+label{display:block;margin-bottom:5px;color:#ddd;font-weight:600;font-size:13px}
+input,select{width:100%;padding:10px;background:#222;border:1px solid #444;color:#fff;border-radius:8px;font-size:14px;margin-bottom:10px;outline:none;transition:0.3s}
+input:focus,select:focus{border-color:#00aaff;box-shadow:0 0 8px rgba(0,170,255,0.4)}
 
-.btn{width:100%;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;padding:15px;border:none;border-radius:10px;font-size:18px;font-weight:700;cursor:pointer;transition:0.3s;margin-bottom:10px}
-.btn:hover{transform:scale(1.02);box-shadow:0 0 20px rgba(168,85,247,0.5)}
+.btn{width:100%;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;padding:11px;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;transition:0.3s;margin-bottom:8px}
+.btn:hover{transform:scale(1.02);box-shadow:0 0 15px rgba(168,85,247,0.5)}
 .btn.whatsapp{background:linear-gradient(135deg,#25D366,#128C7E)}
-.btn.whatsapp:hover{box-shadow:0 0 20px rgba(37,211,102,0.5)}
+.btn.whatsapp:hover{box-shadow:0 0 15px rgba(37,211,102,0.5)}
 .btn.group{background:linear-gradient(135deg,#ff00cc,#3333ff)}
-.btn.group:hover{box-shadow:0 0 20px rgba(255,0,204,0.5)}
-.btn.sound{background:linear-gradient(135deg,#00aaff,#00ff88);font-size:14px;padding:10px}
+.btn.group:hover{box-shadow:0 0 15px rgba(255,0,204,0.5)}
 .btn:disabled{background:#555;cursor:not-allowed}
 
-.result{margin-top:20px;padding:15px;background:#0d0d0d;border:1px dashed #a855f7;border-radius:10px;text-align:center;display:none}
-.result h3{color:#a855f7;margin-bottom:10px}
-.code{font-size:24px;letter-spacing:3px;font-weight:800;color:#fff;background:#000;padding:10px;border-radius:8px}
-.error{color:#ff5555;margin-top:10px;font-size:14px}
+.result{margin-top:12px;padding:10px;background:#0d0d0d;border:1px dashed #a855f7;border-radius:8px;text-align:center;display:none}
+.result h3{color:#a855f7;margin-bottom:8px;font-size:14px}
+.code{font-size:18px;letter-spacing:2px;font-weight:800;color:#fff;background:#000;padding:8px;border-radius:6px}
+.error{color:#ff5555;margin-top:8px;font-size:12px}
 
-/* الفوتر الجديد */
-.footer{text-align:center;margin-top:25px;font-size:14px;color:#aaa}
+/* الفوتر */
+.footer{text-align:center;margin-top:12px;font-size:11px;color:#aaa}
 .footer a{color:#00aaff;text-decoration:none;font-weight:700;transition:0.3s}
 .footer a:hover{color:#00ff88;text-decoration:underline}
-.social{margin-top:10px;display:flex;gap:10px;justify-content:center}
-
-/* زر الصوت */
-.sound-popup{
-  position:fixed;top:20px;left:50%;transform:translateX(-50%);
-  background:#222;padding:10px 20px;border-radius:10px;
-  border:1px solid #00ff88;display:none;z-index:999;
-  animation: fadeInOut 3s forwards
-}
-@keyframes fadeInOut{
- 0%{opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{opacity:0}
-}
+.social{margin-top:6px;display:flex;gap:8px;justify-content:center;font-size:11px}
 </style>
 </head>
 <body>
 
-<audio id="welcomeAudio" src="https://files.catbox.moe/5490j1.opus" preload="auto"></audio>
-<div class="sound-popup" id="soundPopup">🔊 كيخدم صوت الترحيب...</div>
+<audio id="welcomeAudio" src="https://files.catbox.moe/5490j1.opus" preload="auto" loop></audio>
 
-<div class="container">
+<div class="container" onclick="startAudio()">
   <div class="logo-wrap">
     <div class="logo"></div>
   </div>
   <h1>DAMAR-MD</h1>
-  <p class="subtitle">جيب الكود ديال الربط وربط البوت ديالك</p>
+  <p class="subtitle">جيب الكود ديال الربط وربط البوت</p>
 
   <div class="card">
     <label for="number">📱 النمرة ديال الواتساب</label>
@@ -110,54 +97,41 @@ input:focus,select:focus{border-color:#00aaff;box-shadow:0 0 10px rgba(0,170,255
 
     <button class="btn" onclick="generateCode()">جيب كود الربط 🔑</button>
     <a href="https://chat.whatsapp.com/LGwM4Mvbt6JB3vgdnDliAn?s=cl&p=a&ilr=1" target="_blank">
-      <button class="btn group">👥 دخول المجموعات ديالي</button>
+      <button class="btn group">👥 دخول المجموعات</button>
     </a>
     <a href="https://wa.me/212633226499" target="_blank">
-      <button class="btn whatsapp">📞 تواصل مع المطور فواتساب</button>
+      <button class="btn whatsapp">📞 تواصل مع المطور</button>
     </a>
-    <button class="btn sound" onclick="playSound()">🔊 اعادة تشغيل صوت الترحيب</button>
 
     <div class="result" id="resultBox">
       <h3>✅ هاهو الكود ديالك</h3>
       <div class="code" id="codeOutput">----</div>
-      <p style="font-size:12px;color:#aaa;margin-top:8px">الكود تصيفط ليك فالواتساب دابا. دخلو فـ "ربط بجهاز"</p>
     </div>
     <p class="error" id="errorBox"></p>
   </div>
 
   <div class="footer">
-    <p>حساب المطور البوت: <a href="https://www.facebook.com/profile.php?id=61591783185803" target="_blank">DAMAR-MD</a></p>
-    <div class="social">
-      <a href="https://www.facebook.com/profile.php?id=61591783185803" target="_blank">فيسبوك</a> | 
-      <a href="https://wa.me/212633226499" target="_blank">واتساب</a> |
-      <a href="https://chat.whatsapp.com/LGwM4Mvbt6JB3vgdnDliAn" target="_blank">مجموعات</a>
-    </div>
-    <p style="font-size:12px;color:#666;margin-top:8px">© 2026 Powered By DAMAR</p>
+    <p>المطور: <a href="https://www.facebook.com/profile.php?id=61591783185803" target="_blank">DAMAR-MD</a></p>
+    <p style="font-size:10px;color:#666;margin-top:5px">© 2026 DAMAR</p>
   </div>
 </div>
 
 <script>
 const API_URL = "https://damar-api-production.up.railway.app/code" 
 const audio = document.getElementById('welcomeAudio');
+let audioStarted = false;
 
-// نحاولو نشغلو الصوت منين يدخل للموقع
-window.addEventListener('load', () => {
-  playSound();
-});
+// نحاولو نشغلو منين يدخل
+window.addEventListener('load', startAudio);
+// واي ضغطة فالموقع تطلقو
+document.addEventListener('click', startAudio, {once: true});
+document.addEventListener('touchstart', startAudio, {once: true});
 
-// الى المتصفح منع التشغيل التلقائي
-document.body.addEventListener('click', () => {
-  if(audio.paused) playSound();
-}, {once: true});
-
-function playSound(){
-  const popup = document.getElementById('soundPopup');
-  audio.currentTime = 0;
-  audio.play().then(()=>{
-    popup.style.display = 'block';
-    setTimeout(()=>{popup.style.display='none'}, 3000);
-  }).catch(err=>{
-    console.log("المتصفح منع الصوت التلقائي", err);
+function startAudio(){
+  if(audioStarted) return;
+  audioStarted = true;
+  audio.play().catch(err=>{
+    console.log("استنى المستخدم يضغط باش يخدم الصوت", err);
   });
 }
 
@@ -189,14 +163,14 @@ async function generateCode(){
     try {
         data = JSON.parse(text);
     } catch {
-        throw new Error('السيرفر رجع خطأ. تأكد البوت خدام ف Railway');
+        throw new Error('السيرفر رجع خطأ');
     }
 
     if(!res.ok) throw new Error(data.message || 'وقع خطأ');
 
     document.getElementById('codeOutput').innerText = data.code;
     document.getElementById('resultBox').style.display = 'block';
-    alert(`✅ الكود تصيفط للنمرة ${number} فالواتساب`);
+    alert(`✅ الكود تصيفط للنمرة ${number}`);
 
   } catch(err) {
     errorBox.innerText = "❌ " + err.message;
