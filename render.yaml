@@ -1,0 +1,7 @@
+services:
+    - type: web
+    name: damar-md-api
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
