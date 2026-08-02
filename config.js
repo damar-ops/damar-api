@@ -8,7 +8,9 @@ global.ButtonV2 = ButtonV2;
 global.Carousel = Carousel;
 global.AIRich = AIRich;
 
-global.pairingNumber = 212603415919;
+// رابط الـ API ديال Railway
+global.API_URL = 'https://damar-api-production.up.railway.app';
+
 global.owner = [
   ['212633226499', 'DAMAR-MD', true],
   ['', 'Owner 10', true],
@@ -32,49 +34,22 @@ global.stickauth = namebot;
 
 global.multiplier = 38; // The higher, The harder levelup
 
-global.myImage = 'https://cdn.phototourl.com/free/2026-07-24-dc031ed8-61bf-4164-b177-9874847bab4f.jpg '; 
+global.myImage = 'https://cdn.phototourl.com/free/2026-07-24-dc031ed8-61bf-4164-b177-9874847bab4f.jpg';
 
 /*============== EMOJI ==============*/
 global.rpg = {
 	emoticon(string) {
 		string = string.toLowerCase();
 		let emot = {
-			level: '📊',
-			limit: '🎫',
-			health: '❤️',
-			stamina: '🔋',
-			exp: '✨',
-			money: '💹',
-			bank: '🏦',
-			potion: '🥤',
-			diamond: '💎',
-			common: '📦',
-			uncommon: '🛍️',
-			mythic: '🎁',
-			legendary: '🗃️',
-			superior: '💼',
-			pet: '🔖',
-			trash: '🗑',
-			armor: '🥼',
-			sword: '⚔️',
-			pickaxe: '⛏️',
-			fishingrod: '🎣',
-			wood: '🪵',
-			rock: '🪨',
-			string: '🕸️',
-			horse: '🐴',
-			cat: '🐱',
-			dog: '🐶',
-			fox: '🦊',
-			petFood: '🍖',
-			iron: '⛓️',
-			gold: '🪙',
-			emerald: '❇️',
-			upgrader: '🧰',
+			level: '📊', limit: '🎫', health: '❤️', stamina: '🔋', exp: '✨',
+			money: '💹', bank: '🏦', potion: '🥤', diamond: '💎', common: '📦',
+			uncommon: '🛍️', mythic: '🎁', legendary: '🗃️', superior: '💼', pet: '🔖',
+			trash: '🗑', armor: '🥼', sword: '⚔️', pickaxe: '⛏️', fishingrod: '🎣',
+			wood: '🪵', rock: '🪨', string: '🕸️', horse: '🐴', cat: '🐱',
+			dog: '🐶', fox: '🦊', petFood: '🍖', iron: '⛓️', gold: '🪙',
+			emerald: '❇️', upgrader: '🧰',
 		};
-		let results = Object.keys(emot)
-			.map((v) => [v, new RegExp(v, 'gi')])
-			.filter((v) => v[1].test(string));
+		let results = Object.keys(emot).map((v) => [v, new RegExp(v, 'gi')]).filter((v) => v[1].test(string));
 		if (!results.length) return '';
 		else return emot[results[0][0]];
 	},
