@@ -1,51 +1,58 @@
-import express from 'express'
-import { default as makeWASocket, useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
-import cors from 'cors'
-import fs from 'fs'
-import path from 'path'
+import express from 'express';
+import cors from 'cors';
+import pkg from '@whiskeysockets/baileys';
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, delay } = pkg;
 
-const app = express()
-app.use(express.json())
-app.use(cors())
-const PORT = process.env.PORT || 3000 // مهم ل Render
-const SESSIONS_DIR = '/tmp/sessions' // Render كيمسح الملفات من غير /tmp
-if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR)
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-const connections = {}
+// باش الواجهة تقدر تهضر معاه
+app.use(cors());
+app.use(express.json());
 
-async function getConnection(serverId) {
-    if (connections[serverId]) return connections[serverId]
-    const sessionPath = path.join(SESSIONS_DIR, serverId)
-    const { state, saveCreds } = await useMultiFileAuthState(sessionPath)
-    const sock = makeWASocket({ auth: state, printQRInTerminal: false, browser: ['DAMAR-MD', 'Chrome', '1.0.0'] })
-    sock.ev.on('creds.update', saveCreds)
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update
-        if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect.error)?.output?.statusCode!== DisconnectReason.loggedOut
-            if (shouldReconnect) { delete connections[serverId]; setTimeout(()=>getConnection(serverId), 3000) }
-        }
-        if (connection === 'open') console.log(`✅ ${serverId} خدام`)
-    })
-    connections[serverId] = sock
-    return sock
+// دالة باش نجيبو الكود
+async function generatePairingCode(number) {
+    const { state, saveCreds } = await useMultiFileAuthState('./auth');
+    const sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: false
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+
+    try {
+        const code = await sock.requestPairingCode(number);
+        await delay(3000); // عطيه 3 ثواني يصيفط
+        await sock.logout();
+        await sock.end();
+        return code;
+    } catch (e) {
+        console.error(e);
+        await sock.logout();
+        await sock.end();
+        throw new Error('مقدرناش نجيبو الكود');
+    }
 }
 
-app.post('/api/getcode', async (req, res) => {
-    const { number, server } = req.body
-    const cleanNumber = number.replace(/[^0-9]/g, '')
+// هادي هي اللي ناقصاك
+app.post('/code', async (req, res) => {
     try {
-        const conn = await getConnection(server)
-        if (conn.user) return res.status(400).json({ success: false, message: 'السيرفر عامر. ختار واحد اخر' })
-        const code = await conn.requestPairingCode(cleanNumber)
-        const formattedCode = code.match(/.{1,4}/g).join('-')
-        await conn.sendMessage(cleanNumber + '@s.whatsapp.net', { text: `🔑 كود الربط DAMAR-MD: *${formattedCode}*\nدخلو فـ الاجهزة المرتبطة` }).catch(()=>{})
-        res.json({ success: true, code: formattedCode })
-    } catch(e) {
-        console.log(e)
-        res.status(500).json({ success: false, message: e.message })
-    }
-})
+        const { number, server } = req.body;
+        if (!number) return res.status(400).json({ message: 'النمرة خاصها تكون' });
 
-app.get('/', (req,res)=>res.send('DAMAR-MD API is running'))
-app.listen(PORT, () => console.log(`🚀 خدام على ${PORT}`))
+        console.log(`طلب كود للنمرة: ${number} السيرفر: ${server}`);
+        const code = await generatePairingCode(number);
+        
+        res.json({ code: code, message: 'تم ارسال الكود' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+app.get('/', (req, res) => {
+    res.json({ status: 'DAMAR-API is running' });
+});
+
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
