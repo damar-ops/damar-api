@@ -4,71 +4,47 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DAMAR-MD - جيب الكود ديال الربط</title>
+<meta name="theme-color" content="#a855f7">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif}
-body{background:linear-gradient(135deg,#0f0f0f 0%,#1a0033 100%);color:#fff;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:10px;overflow-x:hidden}
-.container{background:#111;border:2px solid #a855f7;border-radius:15px;padding:15px 15px;max-width:360px;width:100%;box-shadow:0 0 20px rgba(168,85,247,0.3);position:relative;animation: glow 4s infinite alternate}
-@keyframes glow {
- 0%{box-shadow:0 0 15px rgba(0,150,255,0.4)}
- 33%{box-shadow:0 0 15px rgba(255,0,0,0.4)}
- 66%{box-shadow:0 0 15px rgba(0,255,0,0.4)}
- 100%{box-shadow:0 0 15px rgba(168,85,247,0.4)}
-}
+body{background:linear-gradient(135deg,#0f0f0f 0%,#1a0033 100%);color:#fff;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:10px}
+.container{background:#111;border:2px solid #a855f7;border-radius:15px;padding:15px;max-width:360px;width:100%;box-shadow:0 0 20px rgba(168,85,247,0.3);animation: glow 4s infinite alternate}
+@keyframes glow {0%{box-shadow:0 0 15px rgba(0,150,255,0.4)} 33%{box-shadow:0 0 15px rgba(255,0,0,0.4)} 66%{box-shadow:0 0 15px rgba(0,255,0,0.4)} 100%{box-shadow:0 0 15px rgba(168,85,247,0.4)}}
 
-/* الدائرة مصغرة */
+/* اللوجو */
 .logo-wrap{width:75px;height:75px;margin:0 auto 10px;position:relative;display:flex;justify-content:center;align-items:center}
-.logo-wrap::before{
-  content:"";
-  position:absolute;
-  inset:-3px;
-  border-radius:50%;
-  background: conic-gradient(from 0deg, #00ff88, #00aaff, #00ff88);
-  animation: spin 3s linear infinite;
-  z-index:0;
-}
-.logo{
-  width:70px;height:70px;border-radius:50%;position:relative;z-index:1;
-  background-image:url('https://files.catbox.moe/bxx6uh.jpg');
-  background-size:cover;background-position:center;
-  border:2px solid #111;
-  animation: pulse 2s infinite alternate;
-}
+.logo-wrap::before{content:"";position:absolute;inset:-3px;border-radius:50%;background: conic-gradient(from 0deg, #00ff88, #00aaff, #00ff88);animation: spin 3s linear infinite;z-index:0;}
+.logo{width:70px;height:70px;border-radius:50%;position:relative;z-index:1;background-image:url('https://files.catbox.moe/bxx6uh.jpg');background-size:cover;background-position:center;border:2px solid #111;animation: pulse 2s infinite alternate;}
 @keyframes spin{ to{transform:rotate(360deg)} }
 @keyframes pulse{ from{transform:scale(1)} to{transform:scale(1.05)} }
 
 h1{color:#a855f7;font-size:24px;text-align:center;margin-bottom:3px;font-weight:800;animation: colorCycle 5s infinite}
-.subtitle{text-align:center;color:#ccc;margin-bottom:15px;font-size:12px;animation: colorCycle 5s infinite 0.5s}
-@keyframes colorCycle{
- 0%{color:#00aaff} 33%{color:#ff0000} 66%{color:#00ff88} 100%{color:#a855f7}
-}
+.subtitle{text-align:center;color:#ccc;margin-bottom:15px;font-size:12px}
+@keyframes colorCycle{0%{color:#00aaff} 33%{color:#ff0000} 66%{color:#00ff88} 100%{color:#a855f7}}
 
 .card{background:#1a1a1a;padding:15px;border-radius:12px;margin-bottom:12px;border:1px solid transparent;animation: borderColor 6s infinite}
-@keyframes borderColor{
- 0%{border-color:#00aaff} 33%{border-color:#ff0000} 66%{border-color:#00ff88} 100%{border-color:#a855f7}
-}
+@keyframes borderColor{0%{border-color:#00aaff} 33%{border-color:#ff0000} 66%{border-color:#00ff88} 100%{border-color:#a855f7}}
+h2{color:#a855f7;font-size:15px;margin-bottom:10px;text-align:center}
 
 label{display:block;margin-bottom:5px;color:#ddd;font-weight:600;font-size:13px}
-input,select{width:100%;padding:10px;background:#222;border:1px solid #444;color:#fff;border-radius:8px;font-size:14px;margin-bottom:10px;outline:none;transition:0.3s}
+input,select{width:100%;padding:10px;background:#222;border:1px solid #444;color:#fff;border-radius:8px;font-size:14px;margin-bottom:10px;outline:none}
 input:focus,select:focus{border-color:#00aaff;box-shadow:0 0 8px rgba(0,170,255,0.4)}
 
-.btn{width:100%;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;padding:11px;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;transition:0.3s;margin-bottom:8px}
+.btn{width:100%;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;padding:11px;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;transition:0.3s;margin-bottom:8px;text-align:center;display:block;text-decoration:none}
 .btn:hover{transform:scale(1.02);box-shadow:0 0 15px rgba(168,85,247,0.5)}
 .btn.whatsapp{background:linear-gradient(135deg,#25D366,#128C7E)}
-.btn.whatsapp:hover{box-shadow:0 0 15px rgba(37,211,102,0.5)}
 .btn.group{background:linear-gradient(135deg,#ff00cc,#3333ff)}
-.btn.group:hover{box-shadow:0 0 15px rgba(255,0,204,0.5)}
+.btn.deploy{background:linear-gradient(135deg,#000,#333)}
 .btn:disabled{background:#555;cursor:not-allowed}
+.deploy-img{width:100%;border-radius:8px;margin-bottom:8px}
 
 .result{margin-top:12px;padding:10px;background:#0d0d0d;border:1px dashed #a855f7;border-radius:8px;text-align:center;display:none}
 .result h3{color:#a855f7;margin-bottom:8px;font-size:14px}
-.code{font-size:18px;letter-spacing:2px;font-weight:800;color:#fff;background:#000;padding:8px;border-radius:6px}
-.error{color:#ff5555;margin-top:8px;font-size:12px}
+.code{font-size:18px;letter-spacing:2px;font-weight:800;color:#00ff88;background:#000;padding:8px;border-radius:6px}
+.error{color:#ff5555;margin-top:8px;font-size:12px;text-align:center}
 
-/* الفوتر */
 .footer{text-align:center;margin-top:12px;font-size:11px;color:#aaa}
-.footer a{color:#00aaff;text-decoration:none;font-weight:700;transition:0.3s}
-.footer a:hover{color:#00ff88;text-decoration:underline}
-.social{margin-top:6px;display:flex;gap:8px;justify-content:center;font-size:11px}
+.footer a{color:#00aaff;text-decoration:none;font-weight:700}
 </style>
 </head>
 <body>
@@ -76,15 +52,27 @@ input:focus,select:focus{border-color:#00aaff;box-shadow:0 0 8px rgba(0,170,255,
 <audio id="welcomeAudio" src="https://files.catbox.moe/5490j1.opus" preload="auto" loop></audio>
 
 <div class="container" onclick="startAudio()">
-  <div class="logo-wrap">
-    <div class="logo"></div>
-  </div>
+  <div class="logo-wrap"><div class="logo"></div></div>
   <h1>DAMAR-MD</h1>
   <p class="subtitle">جيب الكود ديال الربط وربط البوت</p>
 
+  <!-- قسم التنصيب -->
   <div class="card">
+    <h2>🚀 التنصيب السريع</h2>
+    <a href="https://app.koyeb.com/deploy?type=git&repository=damar-ops/DAMAR-MD" target="_blank">
+      <img class="deploy-img" src="https://i.imgur.com/PNoLtFq.png" alt="Deploy to Koyeb">
+    </a>
+    <a class="btn deploy" href="https://railway.app/new/template?template=https://github.com/damar-ops/DAMAR-MD" target="_blank">
+      Deploy on Railway
+    </a>
+    <p style="font-size:10px;color:#999;text-align:center">ملاحظة: فـ Railway خاصك تحط المتغيرات يدويا</p>
+  </div>
+
+  <!-- قسم جلب الكود -->
+  <div class="card">
+    <h2>🔑 جيب كود الربط</h2>
     <label for="number">📱 النمرة ديال الواتساب</label>
-    <input type="text" id="number" placeholder="مثال: 212633226499">
+    <input type="text" id="number" placeholder="مثال: 212633226499" value="212">
 
     <label for="server">🖥️ ختار السيرفر</label>
     <select id="server">
@@ -96,7 +84,8 @@ input:focus,select:focus{border-color:#00aaff;box-shadow:0 0 8px rgba(0,170,255,
     </select>
 
     <button class="btn" onclick="generateCode()">جيب كود الربط 🔑</button>
-    <a href="https://chat.whatsapp.com/LGwM4Mvbt6JB3vgdnDliAn?s=cl&p=a&ilr=1" target="_blank">
+    
+    <a href="https://chat.whatsapp.com/LGwM4Mvbt6JB3vgdnDliAn" target="_blank">
       <button class="btn group">👥 دخول المجموعات</button>
     </a>
     <a href="https://wa.me/212633226499" target="_blank">
@@ -106,13 +95,14 @@ input:focus,select:focus{border-color:#00aaff;box-shadow:0 0 8px rgba(0,170,255,
     <div class="result" id="resultBox">
       <h3>✅ هاهو الكود ديالك</h3>
       <div class="code" id="codeOutput">----</div>
+      <p style="font-size:11px;color:#999;margin-top:5px">دخل هاد الكود فواتساب > الاجهزة المرتبطة</p>
     </div>
     <p class="error" id="errorBox"></p>
   </div>
 
   <div class="footer">
     <p>المطور: <a href="https://www.facebook.com/profile.php?id=61591783185803" target="_blank">DAMAR-MD</a></p>
-    <p style="font-size:10px;color:#666;margin-top:5px">© 2026 DAMAR</p>
+    <p style="font-size:10px;color:#666;margin-top:5px">© 2026 Powered By DAMAR</p>
   </div>
 </div>
 
@@ -121,24 +111,20 @@ const API_URL = "https://damar-api-production.up.railway.app/code"
 const audio = document.getElementById('welcomeAudio');
 let audioStarted = false;
 
-// نحاولو نشغلو منين يدخل
 window.addEventListener('load', startAudio);
-// واي ضغطة فالموقع تطلقو
 document.addEventListener('click', startAudio, {once: true});
 document.addEventListener('touchstart', startAudio, {once: true});
 
 function startAudio(){
   if(audioStarted) return;
   audioStarted = true;
-  audio.play().catch(err=>{
-    console.log("استنى المستخدم يضغط باش يخدم الصوت", err);
-  });
+  audio.play().catch(err=>{console.log("استنى ضغطة", err)});
 }
 
 async function generateCode(){
   const number = document.getElementById('number').value.trim();
   const server = document.getElementById('server').value;
-  const btn = document.querySelector('.btn');
+  const btn = document.querySelector('.card .btn');
   const errorBox = document.getElementById('errorBox');
   errorBox.innerText = "";
   
@@ -158,16 +144,12 @@ async function generateCode(){
       body: JSON.stringify({ number, server })
     });
 
-    const text = await res.text();
-    let data;
-    try {
-        data = JSON.parse(text);
-    } catch {
-        throw new Error('السيرفر رجع خطأ');
+    if(!res.ok){
+      const err = await res.json();
+      throw new Error(err.message || 'السيرفر طافي');
     }
 
-    if(!res.ok) throw new Error(data.message || 'وقع خطأ');
-
+    const data = await res.json();
     document.getElementById('codeOutput').innerText = data.code;
     document.getElementById('resultBox').style.display = 'block';
     alert(`✅ الكود تصيفط للنمرة ${number}`);
