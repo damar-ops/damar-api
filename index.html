@@ -1,29 +1,101 @@
 <!DOCTYPE html>
-<html dir="rtl">
+<html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<title>DAMAR-MD</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DAMAR-MD - جيب الكود ديال الربط</title>
 <style>
-body{background:#0a0a0f;color:#fff;text-align:center;padding:40px;font-family:Arial}
-.logo{width:80px;height:80px;background:linear-gradient(135deg,#7b5cff,#a855f7);border-radius:50%;margin:auto;font-size:40px;display:flex;align-items:center;justify-content:center}
-h1{background:linear-gradient(90deg,#7b5cff,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:35px}
-.card{background:#15151f;border-radius:15px;padding:20px;margin:20px auto;max-width:400px}
-input{width:90%;padding:12px;background:#232336;border:1px solid #3a3a5e;border-radius:10px;color:#fff}
-.btn{width:90%;padding:15px;background:linear-gradient(90deg,#7b5cff,#a855f7);border:none;border-radius:10px;color:#fff;font-size:17px;margin-top:10px}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif}
+body{background:linear-gradient(135deg,#0f0f0f 0%,#1a0033 100%);color:#fff;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px}
+.container{background:#111;border:2px solid #a855f7;border-radius:20px;padding:40px 30px;max-width:500px;width:100%;box-shadow:0 0 30px rgba(168,85,247,0.3)}
+.logo{width:90px;height:90px;background:linear-gradient(135deg,#a855f7,#7c3aed);border-radius:50%;margin:0 auto 15px;display:flex;justify-content:center;align-items:center;font-size:50px}
+h1{color:#a855f7;font-size:35px;text-align:center;margin-bottom:5px;font-weight:800}
+.subtitle{text-align:center;color:#ccc;margin-bottom:25px;font-size:14px}
+.card{background:#1a1a1a;padding:25px;border-radius:15px;margin-bottom:20px}
+label{display:block;margin-bottom:8px;color:#ddd;font-weight:600}
+input,select{width:100%;padding:14px;background:#222;border:1px solid #444;color:#fff;border-radius:10px;font-size:16px;margin-bottom:15px;outline:none}
+input:focus,select:focus{border-color:#a855f7}
+.btn{width:100%;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;padding:15px;border:none;border-radius:10px;font-size:18px;font-weight:700;cursor:pointer;transition:0.3s}
+.btn:hover{transform:scale(1.02);box-shadow:0 0 20px rgba(168,85,247,0.5)}
+.btn:disabled{background:#555;cursor:not-allowed}
+.result{margin-top:20px;padding:15px;background:#0d0d0d;border:1px dashed #a855f7;border-radius:10px;text-align:center;display:none}
+.result h3{color:#a855f7;margin-bottom:10px}
+.code{font-size:24px;letter-spacing:3px;font-weight:800;color:#fff;background:#000;padding:10px;border-radius:8px}
+.footer{text-align:center;margin-top:20px;font-size:12px;color:#666}
 </style>
 </head>
 <body>
-<div class="logo">⚡</div>
-<h1>DAMAR-MD</h1>
-<p>Generate Your Pairing Code</p>
+<div class="container">
+  <div class="logo">⚡</div>
+  <h1>DAMAR-MD</h1>
+  <p class="subtitle">جيب الكود ديال الربط وربط البوت ديالك</p>
 
-<div class="card">
-<p><b>WhatsApp Number</b></p>
-<input placeholder="2126xxxxxxx">
-<br>
-<button class="btn">🔑 Generate Pair Code</button>
+  <div class="card">
+    <label for="number">📱 النمرة ديال الواتساب</label>
+    <input type="text" id="number" placeholder="مثال: 212633226499" value="212633226499">
+
+    <label for="server">🖥️ ختار السيرفر</label>
+    <select id="server">
+      <!-- 20 سيرفر -->
+      <option value="server1">السيرفر 1 - المغرب 🇲🇦</option>
+      <option value="server2">السيرفر 2 - فرنسا 🇫🇷</option>
+      <option value="server3">السيرفر 3 - ألمانيا 🇩🇪</option>
+      <option value="server4">السيرفر 4 - أمريكا 🇺🇸</option>
+      <option value="server5">السيرفر 5 - كندا 🇨🇦</option>
+      <option value="server6">السيرفر 6 - الهند 🇮🇳</option>
+      <option value="server7">السيرفر 7 - سنغافورة 🇸🇬</option>
+      <option value="server8">السيرفر 8 - البرازيل 🇧🇷</option>
+      <option value="server9">السيرفر 9 - اليابان 🇯🇵</option>
+      <option value="server10">السيرفر 10 - أستراليا 🇦🇺</option>
+      <option value="server11">السيرفر 11 - تركيا 🇹🇷</option>
+      <option value="server12">السيرفر 12 - مصر 🇪🇬</option>
+      <option value="server13">السيرفر 13 - السعودية 🇸🇦</option>
+      <option value="server14">السيرفر 14 - الإمارات 🇦🇪</option>
+      <option value="server15">السيرفر 15 - جنوب افريقيا 🇿🇦</option>
+      <option value="server16">السيرفر 16 - هولندا 🇳🇱</option>
+      <option value="server17">السيرفر 17 - بريطانيا 🇬🇧</option>
+      <option value="server18">السيرفر 18 - إسبانيا 🇪🇸</option>
+      <option value="server19">السيرفر 19 - روسيا 🇷🇺</option>
+      <option value="server20">السيرفر 20 - سويسرا 🇨🇭</option>
+    </select>
+
+    <button class="btn" onclick="generateCode()">جيب كود الربط 🔑</button>
+
+    <div class="result" id="resultBox">
+      <h3>✅ هاهو الكود ديالك</h3>
+      <div class="code" id="codeOutput">K27D-YBYM</div>
+      <p style="font-size:12px;color:#aaa;margin-top:8px">دخل هاد الكود فـ الأجهزة المرتبطة</p>
+    </div>
+  </div>
+
+  <p class="footer">© 2026 Powered By DAMAR</p>
 </div>
 
-<p style="margin-top:30px;color:#666">© 2026 Powered By DAMAR</p>
+<script>
+// هادي غير تجربة. خاصك تربطها بالـ API ديال البوت ديالك
+function generateCode(){
+  const number = document.getElementById('number').value;
+  const server = document.getElementById('server').value;
+  const btn = document.querySelector('.btn');
+  
+  if(number.length < 10){
+    alert('دخل النمرة صحيحة ا خويا');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerText = 'كنجيب الكود...';
+  
+  // هنا فين خاصك تصيفط النمرة والسيرفر للسيرفر ديالك باش يولد الكود
+  setTimeout(() => {
+    // كود وهمي باش تشوف الشكل. بدلو بالكود الحقي من السيرفر
+    const fakeCode = Math.random().toString(36).substring(2,6).toUpperCase() + '-' + Math.random().toString(36).substring(2,6).toUpperCase();
+    document.getElementById('codeOutput').innerText = fakeCode;
+    document.getElementById('resultBox').style.display = 'block';
+    btn.disabled = false;
+    btn.innerText = 'جيب كود الربط 🔑';
+  }, 2000);
+}
+</script>
 </body>
 </html>
