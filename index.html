@@ -42,7 +42,6 @@ input:focus,select:focus{border-color:#a855f7}
       <option value="server3">السيرفر 3 - ألمانيا 🇩🇪</option>
       <option value="server4">السيرفر 4 - أمريكا 🇺🇸</option>
       <option value="server5">السيرفر 5 - كندا 🇨🇦</option>
-      <!-- كمل 20 سيرفر -->
     </select>
 
     <button class="btn" onclick="generateCode()">جيب كود الربط 🔑</button>
@@ -59,8 +58,8 @@ input:focus,select:focus{border-color:#a855f7}
 </div>
 
 <script>
-// مهم: بدل هاد الرابط بالرابط ديال API ديال البوت ديالك
-const API_URL = "https://damar-bot-api.onrender.com/api/getcode" 
+// مهم: هادي هي النقطة اللي صلحناها
+const API_URL = "https://damar-api-production.up.railway.app/pair" 
 
 async function generateCode(){
   const number = document.getElementById('number').value.trim();
@@ -79,7 +78,7 @@ async function generateCode(){
   document.getElementById('resultBox').style.display = 'none';
 
   try {
-    // كنصيفطو الطلب للسيرفر ديال البوت
+    // كنصيفطو الطلب للسيرفر ديال Railway
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
