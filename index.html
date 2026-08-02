@@ -21,6 +21,7 @@ input:focus,select:focus{border-color:#a855f7}
 .result{margin-top:20px;padding:15px;background:#0d0d0d;border:1px dashed #a855f7;border-radius:10px;text-align:center;display:none}
 .result h3{color:#a855f7;margin-bottom:10px}
 .code{font-size:24px;letter-spacing:3px;font-weight:800;color:#fff;background:#000;padding:10px;border-radius:8px}
+.error{color:#ff5555;margin-top:10px;font-size:14px}
 .footer{text-align:center;margin-top:20px;font-size:12px;color:#666}
 </style>
 </head>
@@ -32,69 +33,76 @@ input:focus,select:focus{border-color:#a855f7}
 
   <div class="card">
     <label for="number">📱 النمرة ديال الواتساب</label>
-    <input type="text" id="number" placeholder="مثال: 212633226499" value="212633226499">
+    <input type="text" id="number" placeholder="مثال: 212633226499">
 
     <label for="server">🖥️ ختار السيرفر</label>
     <select id="server">
-      <!-- 20 سيرفر -->
       <option value="server1">السيرفر 1 - المغرب 🇲🇦</option>
       <option value="server2">السيرفر 2 - فرنسا 🇫🇷</option>
       <option value="server3">السيرفر 3 - ألمانيا 🇩🇪</option>
       <option value="server4">السيرفر 4 - أمريكا 🇺🇸</option>
       <option value="server5">السيرفر 5 - كندا 🇨🇦</option>
-      <option value="server6">السيرفر 6 - الهند 🇮🇳</option>
-      <option value="server7">السيرفر 7 - سنغافورة 🇸🇬</option>
-      <option value="server8">السيرفر 8 - البرازيل 🇧🇷</option>
-      <option value="server9">السيرفر 9 - اليابان 🇯🇵</option>
-      <option value="server10">السيرفر 10 - أستراليا 🇦🇺</option>
-      <option value="server11">السيرفر 11 - تركيا 🇹🇷</option>
-      <option value="server12">السيرفر 12 - مصر 🇪🇬</option>
-      <option value="server13">السيرفر 13 - السعودية 🇸🇦</option>
-      <option value="server14">السيرفر 14 - الإمارات 🇦🇪</option>
-      <option value="server15">السيرفر 15 - جنوب افريقيا 🇿🇦</option>
-      <option value="server16">السيرفر 16 - هولندا 🇳🇱</option>
-      <option value="server17">السيرفر 17 - بريطانيا 🇬🇧</option>
-      <option value="server18">السيرفر 18 - إسبانيا 🇪🇸</option>
-      <option value="server19">السيرفر 19 - روسيا 🇷🇺</option>
-      <option value="server20">السيرفر 20 - سويسرا 🇨🇭</option>
+      <!-- كمل 20 سيرفر -->
     </select>
 
     <button class="btn" onclick="generateCode()">جيب كود الربط 🔑</button>
 
     <div class="result" id="resultBox">
       <h3>✅ هاهو الكود ديالك</h3>
-      <div class="code" id="codeOutput">K27D-YBYM</div>
-      <p style="font-size:12px;color:#aaa;margin-top:8px">دخل هاد الكود فـ الأجهزة المرتبطة</p>
+      <div class="code" id="codeOutput">----</div>
+      <p style="font-size:12px;color:#aaa;margin-top:8px">الكود تصيفط ليك فالواتساب دابا. دخلو فـ "ربط بجهاز"</p>
     </div>
+    <p class="error" id="errorBox"></p>
   </div>
 
   <p class="footer">© 2026 Powered By DAMAR</p>
 </div>
 
 <script>
-// هادي غير تجربة. خاصك تربطها بالـ API ديال البوت ديالك
-function generateCode(){
-  const number = document.getElementById('number').value;
+// مهم: بدل هاد الرابط بالرابط ديال API ديال البوت ديالك
+const API_URL = "https://damar-bot-api.onrender.com/api/getcode" 
+
+async function generateCode(){
+  const number = document.getElementById('number').value.trim();
   const server = document.getElementById('server').value;
   const btn = document.querySelector('.btn');
+  const errorBox = document.getElementById('errorBox');
+  errorBox.innerText = "";
   
-  if(number.length < 10){
-    alert('دخل النمرة صحيحة ا خويا');
+  if(number.length < 10 || !number.startsWith('212')){
+    alert('دخل النمرة صحيحة ا خويا. خاص تبدا ب 212');
     return;
   }
 
   btn.disabled = true;
   btn.innerText = 'كنجيب الكود...';
-  
-  // هنا فين خاصك تصيفط النمرة والسيرفر للسيرفر ديالك باش يولد الكود
-  setTimeout(() => {
-    // كود وهمي باش تشوف الشكل. بدلو بالكود الحقي من السيرفر
-    const fakeCode = Math.random().toString(36).substring(2,6).toUpperCase() + '-' + Math.random().toString(36).substring(2,6).toUpperCase();
-    document.getElementById('codeOutput').innerText = fakeCode;
+  document.getElementById('resultBox').style.display = 'none';
+
+  try {
+    // كنصيفطو الطلب للسيرفر ديال البوت
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ number, server })
+    });
+
+    const data = await res.json();
+
+    if(!res.ok) throw new Error(data.message || 'وقع خطأ');
+
+    // الكود اللي رجع من البوت
+    document.getElementById('codeOutput').innerText = data.code;
     document.getElementById('resultBox').style.display = 'block';
+    
+    alert(`✅ الكود تصيفط للنمرة ${number} فالواتساب`);
+
+  } catch(err) {
+    errorBox.innerText = "❌ " + err.message;
+    console.error(err);
+  } finally {
     btn.disabled = false;
     btn.innerText = 'جيب كود الربط 🔑';
-  }, 2000);
+  }
 }
 </script>
 </body>
