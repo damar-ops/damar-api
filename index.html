@@ -58,8 +58,8 @@ input:focus,select:focus{border-color:#a855f7}
 </div>
 
 <script>
-// مهم: هادي هي النقطة اللي صلحناها
-const API_URL = "https://damar-api-production.up.railway.app/pair" 
+// صلحناه: بدلنا /pair ب /code
+const API_URL = "https://damar-api-production.up.railway.app/code" 
 
 async function generateCode(){
   const number = document.getElementById('number').value.trim();
@@ -78,18 +78,22 @@ async function generateCode(){
   document.getElementById('resultBox').style.display = 'none';
 
   try {
-    // كنصيفطو الطلب للسيرفر ديال Railway
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ number, server })
     });
 
-    const data = await res.json();
+    const text = await res.text(); // قريناه كـ text لول باش نعرفو واش JSON ولا HTML
+    let data;
+    try {
+        data = JSON.parse(text);
+    } catch {
+        throw new Error('السيرفر رجع خطأ. تأكد البوت خدام ف Railway');
+    }
 
     if(!res.ok) throw new Error(data.message || 'وقع خطأ');
 
-    // الكود اللي رجع من البوت
     document.getElementById('codeOutput').innerText = data.code;
     document.getElementById('resultBox').style.display = 'block';
     
