@@ -3,163 +3,732 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DAMAR-MD - جيب الكود ديال الربط</title>
+
+<title>DAMAR-MD - جيب كود الربط</title>
+
 <style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif}
-body{background:linear-gradient(135deg,#0f0f0f 0%,#1a0033 100%);color:#fff;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:10px;overflow-x:hidden}
-.container{background:#111;border:2px solid #a855f7;border-radius:15px;padding:15px 15px;max-width:360px;width:100%;box-shadow:0 0 20px rgba(168,85,247,0.3);position:relative;animation: glow 4s infinite alternate}
-@keyframes glow {
- 0%{box-shadow:0 0 15px rgba(0,150,255,0.4)}
- 33%{box-shadow:0 0 15px rgba(255,0,0,0.4)}
- 66%{box-shadow:0 0 15px rgba(0,255,0,0.4)}
- 100%{box-shadow:0 0 15px rgba(168,85,247,0.4)}
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 }
-.logo-wrap{width:75px;height:75px;margin:0 auto 10px;position:relative;display:flex;justify-content:center;align-items:center}
-.logo-wrap::before{content:"";position:absolute;inset:-3px;border-radius:50%;background: conic-gradient(from 0deg, #00ff88, #00aaff, #00ff88);animation: spin 3s linear infinite;z-index:0;}
-.logo{width:70px;height:70px;border-radius:50%;position:relative;z-index:1;background-image:url('https://files.catbox.moe/bxx6uh.jpg');background-size:cover;background-position:center;border:2px solid #111;animation: pulse 2s infinite alternate;}
-@keyframes spin{ to{transform:rotate(360deg)} }
-@keyframes pulse{ from{transform:scale(1)} to{transform:scale(1.05)} }
-h1{color:#a855f7;font-size:24px;text-align:center;margin-bottom:3px;font-weight:800;animation: colorCycle 5s infinite}
-.subtitle{text-align:center;color:#ccc;margin-bottom:15px;font-size:12px;animation: colorCycle 5s infinite 0.5s}
-@keyframes colorCycle{0%{color:#00aaff} 33%{color:#ff0000} 66%{color:#00ff88} 100%{color:#a855f7}}
-.card{background:#1a1a1a;padding:15px;border-radius:12px;margin-bottom:12px;border:1px solid transparent;animation: borderColor 6s infinite}
-@keyframes borderColor{0%{border-color:#00aaff} 33%{border-color:#ff0000} 66%{border-color:#00ff88} 100%{border-color:#a855f7}}
-label{display:block;margin-bottom:5px;color:#ddd;font-weight:600;font-size:13px}
-input,select{width:100%;padding:10px;background:#222;border:1px solid #444;color:#fff;border-radius:8px;font-size:14px;margin-bottom:10px;outline:none;transition:0.3s}
-input:focus,select:focus{border-color:#00aaff;box-shadow:0 0 8px rgba(0,170,255,0.4)}
-.btn{width:100%;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;padding:11px;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;transition:0.3s;margin-bottom:8px}
-.btn:hover{transform:scale(1.02);box-shadow:0 0 15px rgba(168,85,247,0.5)}
-.btn.whatsapp{background:linear-gradient(135deg,#25D366,#128C7E)}
-.btn.whatsapp:hover{box-shadow:0 0 15px rgba(37,211,102,0.5)}
-.btn.group{background:linear-gradient(135deg,#ff00cc,#3333ff)}
-.btn.group:hover{box-shadow:0 0 15px rgba(255,0,204,0.5)}
-.btn:disabled{background:#555;cursor:not-allowed}
-.result{margin-top:12px;padding:10px;background:#0d0d0d;border:1px dashed #a855f7;border-radius:8px;text-align:center;display:none}
-.result h3{color:#a855f7;margin-bottom:8px;font-size:14px}
-.code{font-size:18px;letter-spacing:2px;font-weight:800;color:#fff;background:#000;padding:8px;border-radius:6px}
-.error{color:#ff5555;margin-top:8px;font-size:12px}
-.footer{text-align:center;margin-top:12px;font-size:11px;color:#aaa}
-.footer a{color:#00aaff;text-decoration:none;font-weight:700;transition:0.3s}
-.footer a:hover{color:#00ff88;text-decoration:underline}
-.social{margin-top:6px;display:flex;gap:8px;justify-content:center;font-size:11px}
+
+body{
+  background:linear-gradient(135deg,#0f0f0f 0%,#1a0033 100%);
+  color:#fff;
+  min-height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:10px;
+  overflow-x:hidden;
+}
+
+.container{
+  background:#111;
+  border:2px solid #a855f7;
+  border-radius:15px;
+  padding:15px;
+  max-width:360px;
+  width:100%;
+  box-shadow:0 0 20px rgba(168,85,247,.3);
+  position:relative;
+  animation:glow 4s infinite alternate;
+}
+
+@keyframes glow{
+  0%{
+    box-shadow:0 0 15px rgba(0,150,255,.4);
+  }
+  33%{
+    box-shadow:0 0 15px rgba(255,0,0,.4);
+  }
+  66%{
+    box-shadow:0 0 15px rgba(0,255,0,.4);
+  }
+  100%{
+    box-shadow:0 0 15px rgba(168,85,247,.4);
+  }
+}
+
+.logo-wrap{
+  width:75px;
+  height:75px;
+  margin:0 auto 10px;
+  position:relative;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+.logo-wrap::before{
+  content:"";
+  position:absolute;
+  inset:-3px;
+  border-radius:50%;
+  background:conic-gradient(
+    from 0deg,
+    #00ff88,
+    #00aaff,
+    #00ff88
+  );
+  animation:spin 3s linear infinite;
+  z-index:0;
+}
+
+.logo{
+  width:70px;
+  height:70px;
+  border-radius:50%;
+  position:relative;
+  z-index:1;
+  background-image:url('https://files.catbox.moe/bxx6uh.jpg');
+  background-size:cover;
+  background-position:center;
+  border:2px solid #111;
+  animation:pulse 2s infinite alternate;
+}
+
+@keyframes spin{
+  to{
+    transform:rotate(360deg);
+  }
+}
+
+@keyframes pulse{
+  from{
+    transform:scale(1);
+  }
+  to{
+    transform:scale(1.05);
+  }
+}
+
+h1{
+  color:#a855f7;
+  font-size:24px;
+  text-align:center;
+  margin-bottom:3px;
+  font-weight:800;
+  animation:colorCycle 5s infinite;
+}
+
+.subtitle{
+  text-align:center;
+  color:#ccc;
+  margin-bottom:15px;
+  font-size:12px;
+}
+
+@keyframes colorCycle{
+  0%{
+    color:#00aaff;
+  }
+  33%{
+    color:#ff0000;
+  }
+  66%{
+    color:#00ff88;
+  }
+  100%{
+    color:#a855f7;
+  }
+}
+
+.card{
+  background:#1a1a1a;
+  padding:15px;
+  border-radius:12px;
+  margin-bottom:12px;
+  border:1px solid #a855f7;
+}
+
+label{
+  display:block;
+  margin-bottom:5px;
+  color:#ddd;
+  font-weight:600;
+  font-size:13px;
+}
+
+input,
+select{
+  width:100%;
+  padding:10px;
+  background:#222;
+  border:1px solid #444;
+  color:#fff;
+  border-radius:8px;
+  font-size:14px;
+  margin-bottom:10px;
+  outline:none;
+}
+
+input:focus,
+select:focus{
+  border-color:#00aaff;
+  box-shadow:0 0 8px rgba(0,170,255,.4);
+}
+
+.btn{
+  width:100%;
+  background:linear-gradient(135deg,#a855f7,#7c3aed);
+  color:#fff;
+  padding:11px;
+  border:none;
+  border-radius:8px;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+  transition:.3s;
+  margin-bottom:8px;
+}
+
+.btn:hover{
+  transform:scale(1.02);
+  box-shadow:0 0 15px rgba(168,85,247,.5);
+}
+
+.btn:disabled{
+  background:#555;
+  cursor:not-allowed;
+  transform:none;
+}
+
+.btn.whatsapp{
+  background:linear-gradient(135deg,#25D366,#128C7E);
+}
+
+.btn.group{
+  background:linear-gradient(135deg,#ff00cc,#3333ff);
+}
+
+.link-btn{
+  display:block;
+  text-decoration:none;
+}
+
+.result{
+  margin-top:12px;
+  padding:10px;
+  background:#0d0d0d;
+  border:1px dashed #a855f7;
+  border-radius:8px;
+  text-align:center;
+  display:none;
+}
+
+.result h3{
+  color:#a855f7;
+  margin-bottom:8px;
+  font-size:14px;
+}
+
+.code{
+  font-size:22px;
+  letter-spacing:3px;
+  font-weight:800;
+  color:#fff;
+  background:#000;
+  padding:10px;
+  border-radius:6px;
+  user-select:text;
+}
+
+.error{
+  color:#ff5555;
+  margin-top:8px;
+  font-size:12px;
+  text-align:center;
+}
+
+.success{
+  color:#00ff88;
+  margin-top:8px;
+  font-size:12px;
+  text-align:center;
+}
+
+.footer{
+  text-align:center;
+  margin-top:12px;
+  font-size:11px;
+  color:#aaa;
+}
+
+.footer a{
+  color:#00aaff;
+  text-decoration:none;
+  font-weight:700;
+}
+
+.server-status{
+  text-align:center;
+  font-size:11px;
+  color:#aaa;
+  margin-top:5px;
+}
+
+.dot{
+  display:inline-block;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#00ff88;
+  margin-left:4px;
+}
 </style>
 </head>
+
 <body>
 
-<audio id="welcomeAudio" src="https://files.catbox.moe/5490j1.opus" preload="auto" loop></audio>
+<audio
+  id="welcomeAudio"
+  src="https://files.catbox.moe/5490j1.opus"
+  preload="auto"
+  loop>
+</audio>
 
-<div class="container" onclick="startAudio()">
-  <div class="logo-wrap"><div class="logo"></div></div>
+<div class="container">
+
+  <div class="logo-wrap">
+    <div class="logo"></div>
+  </div>
+
   <h1>DAMAR-MD</h1>
-  <p class="subtitle">جيب الكود ديال الربط وربط البوت</p>
+
+  <p class="subtitle">
+    جيب كود الربط وربط البوت
+  </p>
 
   <div class="card">
-    <label for="number">📱 النمرة ديال الواتساب</label>
-    <input type="text" id="number" placeholder="مثال: 212633226499">
 
-    <label for="server">🖥️ ختار السيرفر</label>
+    <label for="number">
+      📱 النمرة ديال الواتساب
+    </label>
+
+    <input
+      type="tel"
+      id="number"
+      placeholder="مثال: 212633226499"
+      inputmode="numeric"
+      autocomplete="tel"
+    >
+
+    <label for="server">
+      🖥️ ختار السيرفر
+    </label>
+
     <select id="server"></select>
 
-    <button class="btn" onclick="generateCode()">جيب كود الربط 🔑</button>
-    <a href="https://chat.whatsapp.com/LGwM4Mvbt6JB3vgdnDliAn?s=cl&p=a&ilr=1" target="_blank">
-      <button class="btn group">👥 دخول المجموعات</button>
-    </a>
-    <a href="https://wa.me/212633226499" target="_blank">
-      <button class="btn whatsapp">📞 تواصل مع المطور</button>
+    <button
+      class="btn"
+      id="pairButton"
+      onclick="generateCode()">
+      🔑 جيب كود الربط
+    </button>
+
+    <a
+      class="link-btn"
+      href="https://chat.whatsapp.com/LGwM4Mvbt6JB3vgdnDliAn?s=cl&p=a&ilr=1"
+      target="_blank"
+      rel="noopener noreferrer">
+
+      <div class="btn group">
+        👥 دخول المجموعات
+      </div>
+
     </a>
 
-    <div class="result" id="resultBox">
-      <h3>✅ هاهو الكود ديالك</h3>
-      <div class="code" id="codeOutput">----</div>
+    <a
+      class="link-btn"
+      href="https://wa.me/212633226499"
+      target="_blank"
+      rel="noopener noreferrer">
+
+      <div class="btn whatsapp">
+        📞 تواصل مع المطور
+      </div>
+
+    </a>
+
+    <div
+      class="result"
+      id="resultBox">
+
+      <h3>
+        ✅ هاهو الكود ديالك
+      </h3>
+
+      <div
+        class="code"
+        id="codeOutput">
+        ----
+      </div>
+
+      <p
+        class="success"
+        id="successBox">
+      </p>
+
     </div>
-    <p class="error" id="errorBox"></p>
+
+    <p
+      class="error"
+      id="errorBox">
+    </p>
+
+    <div class="server-status">
+      <span class="dot"></span>
+      DAMAR-MD API Online
+    </div>
+
   </div>
 
   <div class="footer">
-    <p>المطور: <a href="https://www.facebook.com/profile.php?id=61591783185803" target="_blank">DAMAR-MD</a></p>
-    <p style="font-size:10px;color:#666;margin-top:5px">© 2026 DAMAR</p>
+
+    <p>
+      المطور:
+      <a
+        href="https://www.facebook.com/profile.php?id=61591783185803"
+        target="_blank"
+        rel="noopener noreferrer">
+        DAMAR-MD
+      </a>
+    </p>
+
+    <p
+      style="font-size:10px;color:#666;margin-top:5px">
+      © 2026 DAMAR
+    </p>
+
   </div>
+
 </div>
 
 <script>
-const API_URL = "https://damar-md-api.onrender.com/code"  // <-- بدل غير هادي
-const OWNER_NUMBER = "212633226499" 
-const audio = document.getElementById('welcomeAudio');
+
+/* =========================================
+   DAMAR-MD API
+   ========================================= */
+
+const API_URL =
+  "https://damar-api-production.up.railway.app/api/pair";
+
+const OWNER_NUMBER =
+  "212633226499";
+
+const BOT_NAME =
+  "DAMAR-MD";
+
+
+/* =========================================
+   AUDIO
+   ========================================= */
+
+const audio =
+  document.getElementById("welcomeAudio");
+
 let audioStarted = false;
 
-// باقي الكود خليه كيفما هو;
-
-// نعمرو السيرفرات تلقائي من 1 حتى 50
-const serverSelect = document.getElementById('server');
-for(let i = 1; i <= 50; i++){
-  let option = document.createElement('option');
-  option.value = `server${i}`;
-  option.text = `السيرفر ${i}`;
-  serverSelect.appendChild(option);
-}
-
-window.addEventListener('load', startAudio);
-document.addEventListener('click', startAudio, {once: true});
-document.addEventListener('touchstart', startAudio, {once: true});
-
 function startAudio(){
-  if(audioStarted) return;
-  audioStarted = true;
-  audio.play().catch(err=>{ console.log("استنى المستخدم يضغط", err); });
-}
 
-async function generateCode(){
-  const number = document.getElementById('number').value.trim();
-  const server = document.getElementById('server').value;
-  const btn = document.querySelector('.btn');
-  const errorBox = document.getElementById('errorBox');
-  errorBox.innerText = "";
-  
-  if(number.length < 10 || !number.startsWith('212')){
-    alert('دخل النمرة صحيحة ا خويا. خاص تبدا ب 212');
+  if(audioStarted){
     return;
   }
 
-  btn.disabled = true;
-  btn.innerText = 'كنجيب الكود...';
-  document.getElementById('resultBox').style.display = 'none';
+  audioStarted = true;
 
-  try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        number, 
-        server,
-        owner: OWNER_NUMBER, // زدنا هادي
-        botName: "DAMAR-MD"  // زدنا هادي
-      })
+  audio.play().catch(() => {
+    console.log("Audio autoplay blocked");
+  });
+
+}
+
+document.addEventListener(
+  "click",
+  startAudio,
+  {once:true}
+);
+
+document.addEventListener(
+  "touchstart",
+  startAudio,
+  {once:true}
+);
+
+
+/* =========================================
+   SERVERS
+   ========================================= */
+
+const serverSelect =
+  document.getElementById("server");
+
+for(let i = 1; i <= 50; i++){
+
+  const option =
+    document.createElement("option");
+
+  option.value =
+    String(i);
+
+  option.text =
+    `السيرفر ${i}`;
+
+  serverSelect.appendChild(option);
+
+}
+
+
+/* =========================================
+   GET ELEMENTS
+   ========================================= */
+
+const numberInput =
+  document.getElementById("number");
+
+const pairButton =
+  document.getElementById("pairButton");
+
+const resultBox =
+  document.getElementById("resultBox");
+
+const codeOutput =
+  document.getElementById("codeOutput");
+
+const errorBox =
+  document.getElementById("errorBox");
+
+const successBox =
+  document.getElementById("successBox");
+
+
+/* =========================================
+   GENERATE PAIRING CODE
+   ========================================= */
+
+async function generateCode(){
+
+  startAudio();
+
+  const number =
+    numberInput.value
+      .trim()
+      .replace(/\D/g,"");
+
+  const server =
+    serverSelect.value;
+
+  errorBox.innerText = "";
+  successBox.innerText = "";
+
+  resultBox.style.display = "none";
+
+
+  /* CHECK NUMBER */
+
+  if(!number){
+
+    errorBox.innerText =
+      "❌ دخل نمرة الواتساب";
+
+    return;
+  }
+
+
+  if(!number.startsWith("212")){
+
+    errorBox.innerText =
+      "❌ خاص النمرة تبدا بـ 212";
+
+    return;
+  }
+
+
+  if(number.length < 11 || number.length > 15){
+
+    errorBox.innerText =
+      "❌ النمرة غير صحيحة";
+
+    return;
+  }
+
+
+  /* BUTTON LOADING */
+
+  pairButton.disabled = true;
+
+  pairButton.innerText =
+    "⏳ كنجيب الكود...";
+
+
+  try{
+
+    console.log(
+      "Sending request to:",
+      API_URL
+    );
+
+    console.log({
+      number,
+      server,
+      owner: OWNER_NUMBER,
+      botName: BOT_NAME
     });
 
-    const data = await res.json();
 
-    if(!res.ok) throw new Error(data.message || 'وقع خطأ');
-fetch('https://damar-api-production.up.railway.app/code', { // ماشي localhost
-  method: 'POST',
-  headers: {'Content-Type': 'application/json'},
-  body: JSON.stringify({ 
-    number: "212633226499", 
-    server: "1",
-    owner: "212633226499" 
-  })
-})
-    document.getElementById('codeOutput').innerText = data.code;
-    document.getElementById('resultBox').style.display = 'block';
-    alert(`✅ الكود: ${data.code}\nتصيفط حتى للواتساب ديال المطور`);
+    /* REQUEST TO RAILWAY */
 
-  } catch(err) {
-    errorBox.innerText = "❌ " + err.message;
-    console.error(err);
-  } finally {
-    btn.disabled = false;
-    btn.innerText = 'جيب كود الربط 🔑';
+    const response =
+      await fetch(API_URL, {
+
+        method:"POST",
+
+        headers:{
+          "Content-Type":
+            "application/json"
+        },
+
+        body:JSON.stringify({
+
+          number:number,
+
+          server:server,
+
+          owner:OWNER_NUMBER,
+
+          botName:BOT_NAME
+
+        })
+
+      });
+
+
+    /* READ RESPONSE */
+
+    const data =
+      await response.json();
+
+
+    console.log(
+      "Railway response:",
+      data
+    );
+
+
+    /* ERROR FROM API */
+
+    if(!response.ok){
+
+      throw new Error(
+        data.error ||
+        data.message ||
+        "وقع خطأ فالسيرفر"
+      );
+
+    }
+
+
+    /* ALREADY REGISTERED */
+
+    if(data.registered === true){
+
+      errorBox.innerText =
+        "⚠️ هاد الرقم مربوط من قبل بهاد السيرفر.";
+
+      return;
+
+    }
+
+
+    /* GET CODE */
+
+    const code =
+      data.code ||
+      data.pairingCode;
+
+
+    if(!code){
+
+      throw new Error(
+        "السيرفر خدم ولكن ما رجعش كود الربط"
+      );
+
+    }
+
+
+    /* SHOW CODE */
+
+    codeOutput.innerText =
+      code;
+
+    resultBox.style.display =
+      "block";
+
+
+    successBox.innerText =
+      "📱 دخل هاد الكود فـ WhatsApp > الأجهزة المرتبطة";
+
+
+    /* ALERT */
+
+    alert(
+      "✅ كود الربط:\n\n" +
+      code +
+      "\n\n" +
+      "دخل الكود في WhatsApp > الأجهزة المرتبطة"
+    );
+
+
+  }catch(error){
+
+    console.error(
+      "Pairing error:",
+      error
+    );
+
+
+    errorBox.innerText =
+      "❌ " +
+      (
+        error.message ||
+        "Failed to fetch"
+      );
+
+
+  }finally{
+
+    pairButton.disabled =
+      false;
+
+    pairButton.innerText =
+      "🔑 جيب كود الربط";
+
   }
+
 }
+
+
+/* =========================================
+   ENTER KEY
+   ========================================= */
+
+numberInput.addEventListener(
+  "keydown",
+  function(event){
+
+    if(event.key === "Enter"){
+
+      generateCode();
+
+    }
+
+  }
+);
+
 </script>
+
 </body>
 </html>
