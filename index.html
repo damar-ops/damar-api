@@ -4,13 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DAMAR-MD - جيب الكود ديال الربط</title>
-<script>
-const API_URL = "https://damar-md-api.onrender.com/code"  // <-- بدل غير هادي
-const OWNER_NUMBER = "212633226499" 
-const audio = document.getElementById('welcomeAudio');
-let audioStarted = false;
-
-// باقي الكود خليه كيفما هو
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif}
 body{background:linear-gradient(135deg,#0f0f0f 0%,#1a0033 100%);color:#fff;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:10px;overflow-x:hidden}
@@ -89,10 +82,12 @@ input:focus,select:focus{border-color:#00aaff;box-shadow:0 0 8px rgba(0,170,255,
 </div>
 
 <script>
-const API_URL = "https://damar-api-production.up.railway.app/code" 
-const OWNER_NUMBER = "212633226499" // <-- رقمك باش يوصلك الاشعار
+const API_URL = "https://damar-md-api.onrender.com/code"  // <-- بدل غير هادي
+const OWNER_NUMBER = "212633226499" 
 const audio = document.getElementById('welcomeAudio');
 let audioStarted = false;
+
+// باقي الكود خليه كيفما هو;
 
 // نعمرو السيرفرات تلقائي من 1 حتى 50
 const serverSelect = document.getElementById('server');
