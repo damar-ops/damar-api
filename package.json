@@ -1,8 +1,19 @@
-// config-front.js
-
-export default {
-  API_URL: "https://damar-api-production.up.railway.app",
-  OWNER_NUMBER: "212633226499",
-  BOT_NAME: "DAMAR-MD",
-  TIMEOUT: 60000
-};
+{
+  "name": "damar-api",
+  "version": "2.0.1",
+  "description": "DAMAR-MD WhatsApp Pairing API",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": "20.x"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "6.7.23",
+    "express": "4.21.2",
+    "cors": "2.8.5",
+    "pino": "9.7.0"
+  }
+}
