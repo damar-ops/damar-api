@@ -1,6 +1,6 @@
 {
   "name": "damar-api",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "DAMAR-MD WhatsApp Pairing API",
   "type": "module",
   "main": "server.js",
@@ -8,12 +8,13 @@
     "start": "node server.js"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "20.x"
   },
   "dependencies": {
+    "@hapi/boom": "10.0.1",
     "@whiskeysockets/baileys": "6.7.23",
-    "express": "4.21.2",
     "cors": "2.8.5",
+    "express": "4.21.2",
     "pino": "9.7.0"
   }
 }
