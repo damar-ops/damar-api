@@ -8,10 +8,6 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/* =========================================
-   CONFIG
-========================================= */
-
 const app = express();
 
 const PORT = process.env.PORT || 8080;
@@ -22,79 +18,52 @@ const API_URL =
 const AUTH_DIR =
   path.join(__dirname, "auth_info");
 
-/* =========================================
-   AUTH FOLDER
-========================================= */
-
 if (!fs.existsSync(AUTH_DIR)) {
   fs.mkdirSync(AUTH_DIR, {
     recursive: true
   });
 }
 
-/* =========================================
-   EXPRESS
-========================================= */
-
 app.use(cors({
   origin: "*",
-  methods: [
-    "GET",
-    "POST",
-    "OPTIONS"
-  ],
-  allowedHeaders: [
-    "Content-Type"
-  ]
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"]
 }));
 
 app.use(express.json());
-
-/* =========================================
-   LOGGER
-========================================= */
 
 const logger = pino({
   level: "silent"
 });
 
-/* =========================================
-   VARIABLES
-========================================= */
-
 let sock = null;
-
-let whatsappStatus =
-  "starting";
-
+let whatsappStatus = "starting";
 let connecting = false;
+let reconnectTimer = null;
+
 
 /* =========================================
-   LOAD BAILEYS
+   BAILEYS
 ========================================= */
 
-async function loadBaileys() {
+async function getBaileys() {
 
-  const Baileys =
-    await import(
-      "@whiskeysockets/baileys"
-    );
+  const B = await import(
+    "@whiskeysockets/baileys"
+  );
 
   const makeWASocket =
-    Baileys.default?.default ||
-    Baileys.default ||
-    Baileys.makeWASocket;
+    B.default?.default ||
+    B.default ||
+    B.makeWASocket;
 
   const useMultiFileAuthState =
-    Baileys.useMultiFileAuthState;
+    B.useMultiFileAuthState;
 
   const DisconnectReason =
-    Baileys.DisconnectReason;
+    B.DisconnectReason;
 
-  if (
-    typeof makeWASocket !==
-    "function"
-  ) {
+  if (typeof makeWASocket !== "function") {
     throw new Error(
       "makeWASocket غير موجود في Baileys"
     );
@@ -105,7 +74,7 @@ async function loadBaileys() {
     "function"
   ) {
     throw new Error(
-      "useMultiFileAuthState غير موجود في Baileys"
+      "useMultiFileAuthState غير موجود"
     );
   }
 
@@ -115,6 +84,7 @@ async function loadBaileys() {
     DisconnectReason
   };
 }
+
 
 /* =========================================
    START WHATSAPP
@@ -130,9 +100,7 @@ async function startWhatsApp() {
   }
 
   connecting = true;
-
-  whatsappStatus =
-    "connecting";
+  whatsappStatus = "connecting";
 
   try {
 
@@ -144,15 +112,14 @@ async function startWhatsApp() {
       makeWASocket,
       useMultiFileAuthState,
       DisconnectReason
-    } = await loadBaileys();
+    } = await getBaileys();
 
     const {
       state,
       saveCreds
-    } =
-      await useMultiFileAuthState(
-        AUTH_DIR
-      );
+    } = await useMultiFileAuthState(
+      AUTH_DIR
+    );
 
     sock = makeWASocket({
 
@@ -172,17 +139,42 @@ async function startWhatsApp() {
 
     });
 
+    console.log(
+      "📡 WhatsApp socket created"
+    );
+
+
     /* =====================================
-       SAVE SESSION
+       SAVE CREDENTIALS
     ===================================== */
 
     sock.ev.on(
       "creds.update",
-      saveCreds
+      async () => {
+
+        try {
+
+          await saveCreds();
+
+          console.log(
+            "💾 Session saved"
+          );
+
+        } catch (error) {
+
+          console.error(
+            "❌ Save session error:",
+            error
+          );
+
+        }
+
+      }
     );
 
+
     /* =====================================
-       CONNECTION
+       CONNECTION UPDATE
     ===================================== */
 
     sock.ev.on(
@@ -191,8 +183,19 @@ async function startWhatsApp() {
 
         const {
           connection,
-          lastDisconnect
+          lastDisconnect,
+          qr
         } = update;
+
+
+        if (qr) {
+
+          console.log(
+            "📲 WhatsApp QR received"
+          );
+
+        }
+
 
         if (connection) {
 
@@ -203,13 +206,12 @@ async function startWhatsApp() {
 
         }
 
+
         /* ================================
-           CONNECTED
+           OPEN
         ================================= */
 
-        if (
-          connection === "open"
-        ) {
+        if (connection === "open") {
 
           connecting = false;
 
@@ -233,62 +235,115 @@ async function startWhatsApp() {
 
         }
 
+
         /* ================================
-           CLOSED
+           CLOSE
         ================================= */
 
-        if (
-          connection === "close"
-        ) {
+        if (connection === "close") {
 
           connecting = false;
 
           whatsappStatus =
             "disconnected";
 
-          const statusCode =
-            lastDisconnect
-              ?.error
-              ?.output
-              ?.statusCode;
-
-          console.log(
-            "❌ WhatsApp disconnected"
+          console.error("");
+          console.error(
+            "❌ WHATSAPP DISCONNECTED"
           );
 
-          console.log(
-            "Status:",
+          console.error(
+            "LAST DISCONNECT:"
+          );
+
+          console.error(
+            lastDisconnect
+          );
+
+
+          const error =
+            lastDisconnect?.error;
+
+          console.error(
+            "ERROR:",
+            error
+          );
+
+
+          const statusCode =
+            error?.output?.statusCode ||
+            error?.data?.statusCode ||
+            error?.statusCode;
+
+
+          console.error(
+            "STATUS CODE:",
             statusCode || "unknown"
           );
 
-          const loggedOut =
+
+          console.error(
+            "ERROR MESSAGE:",
+            error?.message ||
+            "unknown"
+          );
+
+          console.error("");
+
+
+          /* ================================
+             LOGGED OUT
+          ================================= */
+
+          if (
             statusCode ===
-            DisconnectReason?.loggedOut;
-
-          if (!loggedOut) {
-
-            console.log(
-              "🔄 إعادة الاتصال بعد 5 ثواني..."
-            );
-
-            setTimeout(() => {
-
-              startWhatsApp();
-
-            }, 5000);
-
-          } else {
+            DisconnectReason?.loggedOut
+          ) {
 
             console.log(
-              "⚠️ WhatsApp خرج من الجهاز."
+              "⚠️ WhatsApp logged out."
             );
+
+            console.log(
+              "🗑️ Session needs to be linked again."
+            );
+
+            return;
 
           }
+
+
+          /* ================================
+             RECONNECT
+          ================================= */
+
+          if (reconnectTimer) {
+            clearTimeout(
+              reconnectTimer
+            );
+          }
+
+          reconnectTimer =
+            setTimeout(
+              () => {
+
+                reconnectTimer = null;
+
+                console.log(
+                  "🔄 إعادة تشغيل WhatsApp..."
+                );
+
+                startWhatsApp();
+
+              },
+              10000
+            );
 
         }
 
       }
     );
+
 
   } catch (error) {
 
@@ -306,15 +361,28 @@ async function startWhatsApp() {
     );
     console.error("");
 
-    setTimeout(() => {
+    if (reconnectTimer) {
+      clearTimeout(
+        reconnectTimer
+      );
+    }
 
-      startWhatsApp();
+    reconnectTimer =
+      setTimeout(
+        () => {
 
-    }, 10000);
+          reconnectTimer = null;
+
+          startWhatsApp();
+
+        },
+        10000
+      );
 
   }
 
 }
+
 
 /* =========================================
    HOME
@@ -325,6 +393,7 @@ app.get(
   (req, res) => {
 
     res.send(`
+
 <!DOCTYPE html>
 
 <html lang="ar" dir="rtl">
@@ -351,17 +420,15 @@ body {
   min-height: 100vh;
 
   background:
-    radial-gradient(
-      circle at top,
-      #351052,
-      #09070d 60%
-    );
+  radial-gradient(
+    circle at top,
+    #32104c,
+    #08060c 65%
+  );
 
   color: white;
 
-  font-family:
-    Arial,
-    sans-serif;
+  font-family: Arial, sans-serif;
 
   display: flex;
 
@@ -375,7 +442,7 @@ body {
 
   width: 100%;
 
-  max-width: 520px;
+  max-width: 540px;
 
   background: #111;
 
@@ -386,8 +453,7 @@ body {
   padding: 25px;
 
   box-shadow:
-    0 0 25px #8c20ff,
-    inset 0 0 30px #180c22;
+    0 0 30px #7c20ff;
 
 }
 
@@ -395,12 +461,11 @@ h1 {
 
   text-align: center;
 
-  color: #ff1717;
+  color: #ff1616;
 
-  font-size: 36px;
+  font-size: 38px;
 
-  margin:
-    10px 0;
+  margin: 10px 0;
 
 }
 
@@ -408,7 +473,7 @@ h1 {
 
   text-align: center;
 
-  color: #d83c3c;
+  color: #d44343;
 
   margin-bottom: 25px;
 
@@ -418,22 +483,19 @@ h1 {
 
   text-align: center;
 
-  padding: 12px;
+  background: #1c1c1c;
+
+  padding: 14px;
+
+  border-radius: 14px;
 
   margin-bottom: 20px;
-
-  border-radius: 12px;
-
-  background: #1d1d1d;
-
-  color: #00ff88;
 
 }
 
 .box {
 
-  border:
-    2px solid #e00000;
+  border: 2px solid #9b39ff;
 
   border-radius: 20px;
 
@@ -446,7 +508,7 @@ label {
   display: block;
 
   margin:
-    12px 0 7px;
+    12px 0 8px;
 
   font-size: 18px;
 
@@ -459,14 +521,13 @@ select {
 
   padding: 16px;
 
-  border-radius: 14px;
-
-  border:
-    2px solid #444;
-
   background: #222;
 
   color: white;
+
+  border: 2px solid #444;
+
+  border-radius: 14px;
 
   font-size: 17px;
 
@@ -480,52 +541,50 @@ button {
 
   border: none;
 
-  border-radius: 15px;
-
-  padding: 17px;
-
-  margin-top: 14px;
-
   color: white;
 
   font-size: 19px;
 
   font-weight: bold;
 
-  cursor: pointer;
+  padding: 17px;
+
+  border-radius: 15px;
+
+  margin-top: 14px;
 
 }
 
 .pair {
 
   background:
-    linear-gradient(
-      90deg,
-      #a348ff,
-      #7132ff
-    );
+  linear-gradient(
+    90deg,
+    #a348ff,
+    #7132ff
+  );
 
 }
 
 .groups {
 
   background:
-    linear-gradient(
-      90deg,
-      #ff00bf,
-      #293dff
-    );
+  linear-gradient(
+    90deg,
+    #ff00c8,
+    #293dff
+  );
 
 }
 
 .contact {
 
   background:
-    linear-gradient(
-      90deg,
-      #16d45b,
-      #129a88
-    );
+  linear-gradient(
+    90deg,
+    #14d55b,
+    #139e8b
+  );
 
 }
 
@@ -535,39 +594,39 @@ button {
 
   margin-top: 20px;
 
-  text-align: center;
-
   padding: 18px;
 
   background: #1b1b1b;
 
   border-radius: 15px;
 
+  text-align: center;
+
 }
 
 .code {
 
-  font-size: 30px;
+  direction: ltr;
+
+  font-size: 31px;
+
+  font-weight: bold;
 
   letter-spacing: 5px;
 
   color: #00eaff;
 
-  font-weight: bold;
-
   margin-top: 12px;
-
-  direction: ltr;
 
 }
 
 .message {
 
-  margin-top: 12px;
-
   color: #ddd;
 
-  line-height: 1.7;
+  line-height: 1.8;
+
+  margin-top: 12px;
 
 }
 
@@ -575,9 +634,9 @@ button {
 
   text-align: center;
 
-  margin-top: 25px;
+  color: #777;
 
-  color: #888;
+  margin-top: 25px;
 
 }
 
@@ -592,14 +651,14 @@ button {
 <h1>DAMAR-MD</h1>
 
 <div class="subtitle">
-جيب كود الربط وربط البوت
+جيب الكود ديال الربط وربط البوت
 </div>
 
 <div
 id="status"
 class="status">
 
-🟡 جاري تشغيل API...
+🟡 جاري تشغيل WhatsApp...
 
 </div>
 
@@ -657,7 +716,7 @@ id="result"
 class="result">
 
 <div>
-🔑 كود الربط:
+🔑 كود الربط
 </div>
 
 <div
@@ -681,11 +740,8 @@ class="message">
 <div class="footer">
 
 المطور:
-<strong
-style="color:#00aaff">
-
+<strong style="color:#00aaff">
 DAMAR-MD
-
 </strong>
 
 <br><br>
@@ -695,6 +751,7 @@ DAMAR 2026 ©
 </div>
 
 </div>
+
 
 <script>
 
@@ -714,16 +771,13 @@ async function checkAPI() {
       await fetch(
         API + "/health",
         {
-          method: "GET"
+          method: "GET",
+          cache: "no-store"
         }
       );
 
     if (!response.ok) {
-
-      throw new Error(
-        "API Error"
-      );
-
+      throw new Error("API error");
     }
 
     const data =
@@ -742,10 +796,18 @@ async function checkAPI() {
       status.innerHTML =
         "🟢 API ONLINE — WhatsApp متصل";
 
+    } else if (
+      data.whatsapp ===
+      "connecting"
+    ) {
+
+      status.innerHTML =
+        "🟡 API ONLINE — WhatsApp كيتصل...";
+
     } else {
 
       status.innerHTML =
-        "🟢 API ONLINE — WhatsApp: "
+        "🟠 API ONLINE — WhatsApp: "
         + data.whatsapp;
 
     }
@@ -755,7 +817,7 @@ async function checkAPI() {
     document.getElementById(
       "status"
     ).innerHTML =
-      "🔴 API غير متصل";
+      "🔴 Failed to fetch";
 
   }
 
@@ -763,7 +825,7 @@ async function checkAPI() {
 
 
 /* =====================================
-   GET PAIRING CODE
+   PAIRING CODE
 ===================================== */
 
 async function getPairingCode() {
@@ -788,9 +850,11 @@ async function getPairingCode() {
       "message"
     );
 
+
   let phone =
     input.value
       .replace(/\\D/g, "");
+
 
   if (!phone) {
 
@@ -802,6 +866,7 @@ async function getPairingCode() {
 
   }
 
+
   if (phone.length < 8) {
 
     alert(
@@ -812,14 +877,16 @@ async function getPairingCode() {
 
   }
 
+
   result.style.display =
     "block";
 
   code.innerText =
-    "جاري...";
+    "⏳";
 
   message.innerText =
-    "⏳ كنوجد كود الربط...";
+    "جاري طلب كود الربط...";
+
 
   try {
 
@@ -835,25 +902,27 @@ async function getPairingCode() {
           },
 
           body: JSON.stringify({
-            phone: phone
+            phone
           })
         }
       );
 
+
     const data =
       await response.json();
 
-    if (
-      !response.ok ||
-      !data.success
-    ) {
+
+    if (!response.ok ||
+        !data.success) {
 
       throw new Error(
         data.message ||
-        "فشل الاتصال بالـ API"
+        data.error ||
+        "فشل الحصول على الكود"
       );
 
     }
+
 
     if (
       data.alreadyPaired
@@ -863,20 +932,28 @@ async function getPairingCode() {
         "✓";
 
       message.innerText =
-        "✅ الجهاز راه مربوط من قبل";
+        "✅ الجهاز مربوط من قبل";
 
       return;
 
     }
 
+
     code.innerText =
       data.code ||
       "--------";
 
+
     message.innerHTML =
-      "✅ تم إنشاء الكود"
+      "✅ تم إنشاء كود الربط"
       + "<br><br>"
-      + "فتح WhatsApp → الأجهزة المرتبطة → ربط جهاز → الربط برقم الهاتف";
+      + "في WhatsApp افتح:"
+      + "<br>"
+      + "الأجهزة المرتبطة"
+      + " → "
+      + "ربط جهاز"
+      + " → "
+      + "الربط برقم الهاتف";
 
   } catch (error) {
 
@@ -884,7 +961,6 @@ async function getPairingCode() {
       "❌";
 
     message.innerText =
-      "خطأ: " +
       error.message;
 
   }
@@ -899,7 +975,7 @@ async function getPairingCode() {
 function joinGroups() {
 
   alert(
-    "ضع رابط مجموعة WhatsApp هنا"
+    "أضف رابط مجموعة WhatsApp هنا."
   );
 
 }
@@ -912,7 +988,7 @@ function joinGroups() {
 function contactDeveloper() {
 
   alert(
-    "ضع رابط التواصل مع المطور هنا"
+    "أضف رابط التواصل مع المطور هنا."
   );
 
 }
@@ -934,10 +1010,12 @@ setInterval(
 </body>
 
 </html>
+
 `);
 
   }
 );
+
 
 /* =========================================
    HEALTH
@@ -958,9 +1036,15 @@ app.get(
       whatsapp:
         whatsappStatus,
 
-      api: API_URL,
+      connected:
+        whatsappStatus ===
+        "connected",
 
-      port: PORT,
+      api:
+        API_URL,
+
+      port:
+        PORT,
 
       time:
         new Date().toISOString()
@@ -969,6 +1053,7 @@ app.get(
 
   }
 );
+
 
 /* =========================================
    STATUS
@@ -999,6 +1084,7 @@ app.get(
   }
 );
 
+
 /* =========================================
    PAIRING CODE
 ========================================= */
@@ -1020,6 +1106,7 @@ app.post(
           ""
         );
 
+
       if (!phone) {
 
         return res
@@ -1034,6 +1121,7 @@ app.post(
           });
 
       }
+
 
       if (phone.length < 8) {
 
@@ -1050,19 +1138,10 @@ app.post(
 
       }
 
-      if (!sock) {
 
-        await startWhatsApp();
-
-        await new Promise(
-          resolve =>
-            setTimeout(
-              resolve,
-              3000
-            )
-        );
-
-      }
+      /* =================================
+         IF SOCKET IS NOT READY
+      ================================= */
 
       if (!sock) {
 
@@ -1073,20 +1152,19 @@ app.post(
             success: false,
 
             message:
-              "⏳ WhatsApp مازال كيتشغل، عاود المحاولة"
+              "⏳ WhatsApp مازال كيتشغل، عاود المحاولة بعد قليل"
 
           });
 
       }
 
-      /* ================================
-         CHECK REGISTERED
+
+      /* =================================
+         ALREADY REGISTERED
       ================================= */
 
       if (
-        sock.authState
-          ?.creds
-          ?.registered
+        sock.authState?.creds?.registered
       ) {
 
         return res.json({
@@ -1102,12 +1180,15 @@ app.post(
 
       }
 
+
+      console.log("");
       console.log(
-        "📱 Pairing request:",
+        "📱 طلب Pairing Code للرقم:",
         phone
       );
 
-      /* ================================
+
+      /* =================================
          REQUEST CODE
       ================================= */
 
@@ -1116,10 +1197,12 @@ app.post(
           phone
         );
 
+
       console.log(
         "🔑 Pairing Code:",
         pairingCode
       );
+
 
       return res.json({
 
@@ -1136,12 +1219,20 @@ app.post(
 
       });
 
+
     } catch (error) {
 
+      console.error("");
       console.error(
-        "❌ Pairing error:",
+        "❌ PAIRING CODE ERROR:"
+      );
+
+      console.error(
         error
       );
+
+      console.error("");
+
 
       return res
         .status(500)
@@ -1163,6 +1254,7 @@ app.post(
   }
 );
 
+
 /* =========================================
    404
 ========================================= */
@@ -1182,8 +1274,9 @@ app.use(
   }
 );
 
+
 /* =========================================
-   START SERVER
+   SERVER
 ========================================= */
 
 app.listen(
