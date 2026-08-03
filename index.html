@@ -88,11 +88,7 @@ input:focus,select:focus{border-color:#00aaff;box-shadow:0 0 8px rgba(0,170,255,
 
     <label for="server">🖥️ ختار السيرفر</label>
     <select id="server">
-      <option value="server1">السيرفر 1 - المغرب 🇲🇦</option>
-      <option value="server2">السيرفر 2 - فرنسا 🇫🇷</option>
-      <option value="server3">السيرفر 3 - ألمانيا 🇩🇪</option>
-      <option value="server4">السيرفر 4 - أمريكا 🇺🇸</option>
-      <option value="server5">السيرفر 5 - كندا 🇨🇦</option>
+      <!-- 50 سيرفر -->
     </select>
 
     <button class="btn" onclick="generateCode()">جيب كود الربط 🔑</button>
@@ -120,6 +116,15 @@ input:focus,select:focus{border-color:#00aaff;box-shadow:0 0 8px rgba(0,170,255,
 const API_URL = "https://damar-api-production.up.railway.app/code" 
 const audio = document.getElementById('welcomeAudio');
 let audioStarted = false;
+
+// نعمرو السيرفرات تلقائي من 1 حتى 50
+const serverSelect = document.getElementById('server');
+for(let i = 1; i <= 50; i++){
+  let option = document.createElement('option');
+  option.value = `server${i}`;
+  option.text = `السيرفر ${i}`;
+  serverSelect.appendChild(option);
+}
 
 // نحاولو نشغلو منين يدخل
 window.addEventListener('load', startAudio);
