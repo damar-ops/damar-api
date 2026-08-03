@@ -12,30 +12,30 @@ import makeWASocket, {
   fetchLatestBaileysVersion
 } from '@whiskeysockets/baileys'
 
-import { Boom } from '@hapi/boom'
-
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const app = express()
 
-// ===============================
+// ==========================================
 // DAMAR-MD CONFIG
-// ===============================
+// ==========================================
 
 const PORT = process.env.PORT || 8080
 
-// Railway Volume إذا كان موجودا يستعمل /data
+// Railway Volume:
+// خاص Volume يكون mounted فـ /data
 const AUTH_DIR =
   process.env.AUTH_DIR ||
-  (fs.existsSync('/data') ? '/data/damar-auth' : path.join(__dirname, 'auth'))
+  (fs.existsSync('/data')
+    ? '/data/damar-auth'
+    : path.join(__dirname, 'auth'))
 
 const BOT_NAME = 'DAMAR-MD'
-const DEFAULT_SERVER = '1'
 
-// ===============================
+// ==========================================
 // EXPRESS
-// ===============================
+// ==========================================
 
 app.use(cors({
   origin: '*',
@@ -44,19 +44,21 @@ app.use(cors({
 }))
 
 app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+app.use(express.urlencoded({
+  extended: true
+}))
 
-// ===============================
-// LOGGING
-// ===============================
+// ==========================================
+// LOGGER
+// ==========================================
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info'
 })
 
-// ===============================
+// ==========================================
 // GLOBAL STATE
-// ===============================
+// ==========================================
 
 let sock = null
 let state = null
@@ -64,36 +66,54 @@ let saveCreds = null
 
 let connectionStatus = 'starting'
 let lastError = null
+
 let pairingCode = null
 let pairingNumber = null
+
 let reconnectTimer = null
 let starting = false
 let reconnectAttempts = 0
 
-// ===============================
-// CREATE AUTH DIRECTORY
-// ===============================
+// ==========================================
+// PREPARE AUTH
+// ==========================================
 
 function prepareAuthDir() {
+
   try {
+
     if (!fs.existsSync(AUTH_DIR)) {
+
       fs.mkdirSync(AUTH_DIR, {
         recursive: true
       })
+
     }
 
-    console.log(`[${BOT_NAME}] 📁 Auth folder: ${AUTH_DIR}`)
+    console.log(
+      `[${BOT_NAME}] 📁 Auth folder: ${AUTH_DIR}`
+    )
+
   } catch (error) {
-    console.error(`[${BOT_NAME}] ❌ Auth folder error:`, error)
+
+    console.error(
+      `[${BOT_NAME}] ❌ Auth folder error:`,
+      error.message
+    )
+
   }
+
 }
 
-// ===============================
-// CLEAN PHONE NUMBER
-// ===============================
+// ==========================================
+// CLEAN NUMBER
+// ==========================================
 
 function cleanNumber(number) {
-  if (!number) return null
+
+  if (!number) {
+    return null
+  }
 
   let value = String(number)
 
@@ -104,21 +124,29 @@ function cleanNumber(number) {
   }
 
   return value
+
 }
 
-// ===============================
+// ==========================================
 // START WHATSAPP
-// ===============================
+// ==========================================
 
 async function startWhatsApp() {
+
   if (starting) {
-    console.log(`[${BOT_NAME}] ⏳ WhatsApp already starting...`)
+
+    console.log(
+      `[${BOT_NAME}] ⏳ WhatsApp already starting`
+    )
+
     return
+
   }
 
   starting = true
 
   try {
+
     prepareAuthDir()
 
     console.log('')
@@ -126,30 +154,42 @@ async function startWhatsApp() {
     console.log(`🚀 ${BOT_NAME} WhatsApp Starting`)
     console.log('======================================')
 
-    const auth = await useMultiFileAuthState(AUTH_DIR)
+    const auth =
+      await useMultiFileAuthState(AUTH_DIR)
 
     state = auth.state
     saveCreds = auth.saveCreds
 
-    let version
+    let version = null
 
     try {
-      const latest = await fetchLatestBaileysVersion()
 
-      if (latest && latest.version) {
+      const latest =
+        await fetchLatestBaileysVersion()
+
+      if (
+        latest &&
+        latest.version
+      ) {
+
         version = latest.version
 
         console.log(
           `[${BOT_NAME}] 📦 WhatsApp version: ${version.join('.')}`
         )
+
       }
-    } catch (versionError) {
+
+    } catch {
+
       console.log(
-        `[${BOT_NAME}] ⚠️ Could not get latest WA version, using Baileys default`
+        `[${BOT_NAME}] ⚠️ Using default Baileys version`
       )
+
     }
 
     const options = {
+
       auth: state,
 
       logger,
@@ -171,10 +211,13 @@ async function startWhatsApp() {
       keepAliveIntervalMs: 30000,
 
       retryRequestDelayMs: 1000
+
     }
 
     if (version) {
+
       options.version = version
+
     }
 
     sock = makeWASocket(options)
@@ -182,124 +225,192 @@ async function startWhatsApp() {
     connectionStatus = 'connecting'
     lastError = null
 
-    console.log(`[${BOT_NAME}] 📡 WhatsApp: connecting`)
+    console.log(
+      `[${BOT_NAME}] 📡 WhatsApp: connecting`
+    )
 
-    // ===============================
+    // ========================================
     // SAVE CREDENTIALS
-    // ===============================
+    // ========================================
 
-    sock.ev.on('creds.update', async () => {
-      try {
-        await saveCreds()
-      } catch (error) {
-        console.error(
-          `[${BOT_NAME}] ❌ Failed saving credentials:`,
-          error.message
-        )
-      }
-    })
-
-    // ===============================
-    // CONNECTION UPDATE
-    // ===============================
-
-    sock.ev.on('connection.update', async (update) => {
-      const {
-        connection,
-        lastDisconnect
-      } = update
-
-      if (connection === 'connecting') {
-        connectionStatus = 'connecting'
-
-        console.log(
-          `[${BOT_NAME}] 📡 WhatsApp: connecting`
-        )
-      }
-
-      if (connection === 'open') {
-        connectionStatus = 'connected'
-        lastError = null
-        reconnectAttempts = 0
-        pairingCode = null
-
-        console.log('')
-        console.log('======================================')
-        console.log(`✅ ${BOT_NAME} WhatsApp CONNECTED`)
-        console.log('======================================')
-        console.log('')
-      }
-
-      if (connection === 'close') {
-        connectionStatus = 'disconnected'
-
-        let statusCode = 'unknown'
-        let errorMessage = 'Unknown error'
+    sock.ev.on(
+      'creds.update',
+      async () => {
 
         try {
-          const error = lastDisconnect?.error
 
-          if (error) {
-            statusCode =
-              error?.output?.statusCode ||
-              error?.statusCode ||
-              'unknown'
+          await saveCreds()
 
-            errorMessage =
-              error?.message ||
-              String(error)
-          }
         } catch (error) {
+
           console.error(
-            `[${BOT_NAME}] Error reading disconnect:`,
+            `[${BOT_NAME}] ❌ Save credentials error:`,
             error.message
           )
+
         }
 
-        lastError = {
-          statusCode,
-          message: errorMessage
-        }
-
-        console.log(
-          `[${BOT_NAME}] ❌ WhatsApp disconnected: ${statusCode}`
-        )
-
-        console.log(
-          `[${BOT_NAME}] ❌ ERROR MESSAGE: ${errorMessage}`
-        )
-
-        const loggedOut =
-          statusCode === DisconnectReason.loggedOut
-
-        const badSession =
-          statusCode === DisconnectReason.badSession
-
-        if (loggedOut) {
-          console.log(
-            `[${BOT_NAME}] 🔒 Account logged out.`
-          )
-
-          connectionStatus = 'logged_out'
-          return
-        }
-
-        if (badSession) {
-          console.log(
-            `[${BOT_NAME}] ⚠️ Bad session detected.`
-          )
-        }
-
-        scheduleReconnect()
       }
-    })
+    )
+
+    // ========================================
+    // CONNECTION UPDATE
+    // ========================================
+
+    sock.ev.on(
+      'connection.update',
+      async update => {
+
+        const {
+          connection,
+          lastDisconnect
+        } = update
+
+        // -------------------------------
+        // CONNECTING
+        // -------------------------------
+
+        if (connection === 'connecting') {
+
+          connectionStatus = 'connecting'
+
+          console.log(
+            `[${BOT_NAME}] 📡 WhatsApp: connecting`
+          )
+
+        }
+
+        // -------------------------------
+        // OPEN
+        // -------------------------------
+
+        if (connection === 'open') {
+
+          connectionStatus = 'connected'
+
+          lastError = null
+
+          reconnectAttempts = 0
+
+          pairingCode = null
+
+          console.log('')
+          console.log('======================================')
+          console.log(`✅ ${BOT_NAME} WhatsApp CONNECTED`)
+          console.log('======================================')
+          console.log('')
+
+        }
+
+        // -------------------------------
+        // CLOSE
+        // -------------------------------
+
+        if (connection === 'close') {
+
+          connectionStatus = 'disconnected'
+
+          let statusCode = 'unknown'
+          let errorMessage = 'Unknown error'
+
+          try {
+
+            const error =
+              lastDisconnect?.error
+
+            if (error) {
+
+              statusCode =
+                error?.output?.statusCode ||
+                error?.statusCode ||
+                'unknown'
+
+              errorMessage =
+                error?.message ||
+                String(error)
+
+            }
+
+          } catch (error) {
+
+            console.error(
+              `[${BOT_NAME}] Error reading disconnect:`,
+              error.message
+            )
+
+          }
+
+          lastError = {
+
+            statusCode,
+
+            message: errorMessage
+
+          }
+
+          console.log(
+            `[${BOT_NAME}] ❌ WhatsApp disconnected: ${statusCode}`
+          )
+
+          console.log(
+            `[${BOT_NAME}] ❌ ERROR MESSAGE: ${errorMessage}`
+          )
+
+          // 401 = session logged out
+          if (
+            statusCode === DisconnectReason.loggedOut
+          ) {
+
+            console.log(
+              `[${BOT_NAME}] 🔒 Account logged out.`
+            )
+
+            connectionStatus = 'logged_out'
+
+            sock = null
+
+            return
+
+          }
+
+          // Bad session
+          if (
+            statusCode === DisconnectReason.badSession
+          ) {
+
+            console.log(
+              `[${BOT_NAME}] ⚠️ Bad session detected.`
+            )
+
+            connectionStatus = 'bad_session'
+
+            sock = null
+
+            return
+
+          }
+
+          scheduleReconnect()
+
+        }
+
+      }
+    )
 
   } catch (error) {
+
     connectionStatus = 'error'
 
     lastError = {
-      statusCode: error?.statusCode || 'unknown',
-      message: error?.message || String(error)
+
+      statusCode:
+        error?.statusCode ||
+        'unknown',
+
+      message:
+        error?.message ||
+        String(error)
+
     }
 
     console.error(
@@ -310,111 +421,179 @@ async function startWhatsApp() {
     scheduleReconnect()
 
   } finally {
+
     starting = false
+
   }
+
 }
 
-// ===============================
+// ==========================================
 // RECONNECT
-// ===============================
+// ==========================================
 
 function scheduleReconnect() {
+
   if (reconnectTimer) {
     return
   }
 
   reconnectAttempts++
 
-  const delay = Math.min(
-    5000 * reconnectAttempts,
-    30000
-  )
+  const delay =
+    Math.min(
+      5000 * reconnectAttempts,
+      30000
+    )
 
   console.log(
     `[${BOT_NAME}] 🔄 Reconnecting after ${delay / 1000}s...`
   )
 
-  reconnectTimer = setTimeout(async () => {
-    reconnectTimer = null
+  reconnectTimer =
+    setTimeout(
+      async () => {
 
-    try {
-      if (sock) {
+        reconnectTimer = null
+
         try {
-          sock.end(undefined)
+
+          if (sock) {
+
+            try {
+              sock.end(undefined)
+            } catch {}
+
+          }
+
         } catch {}
-      }
-    } catch {}
 
-    sock = null
+        sock = null
 
-    await startWhatsApp()
-  }, delay)
+        await startWhatsApp()
+
+      },
+      delay
+    )
+
 }
 
-// ===============================
+// ==========================================
 // GET PAIRING CODE
-// ===============================
+// ==========================================
 
 async function getPairingCode(number) {
+
   number = cleanNumber(number)
 
   if (!number) {
+
     throw new Error(
       'WhatsApp number is required'
     )
+
   }
 
   if (!/^\d{8,15}$/.test(number)) {
+
     throw new Error(
       'Invalid WhatsApp number'
     )
+
   }
 
   prepareAuthDir()
 
-  // إذا عندنا session مسجلة
-  if (state?.creds?.registered) {
+  // ========================================
+  // IF ALREADY REGISTERED
+  // ========================================
+
+  if (
+    state?.creds?.registered
+  ) {
+
     return {
+
       alreadyRegistered: true,
+
       code: null
+
     }
+
   }
 
-  // إذا socket غير موجود
+  // ========================================
+  // START SOCKET IF NEEDED
+  // ========================================
+
   if (!sock) {
+
     await startWhatsApp()
+
   }
 
-  // انتظر socket شوية باش يكون جاهز
-  for (let i = 0; i < 15; i++) {
-    if (sock) break
+  // ========================================
+  // WAIT FOR SOCKET
+  // ========================================
 
-    await new Promise(resolve =>
-      setTimeout(resolve, 1000)
+  for (
+    let i = 0;
+    i < 20;
+    i++
+  ) {
+
+    if (sock) {
+      break
+    }
+
+    await new Promise(
+      resolve =>
+        setTimeout(resolve, 1000)
     )
+
   }
 
   if (!sock) {
+
     throw new Error(
       'WhatsApp socket is not available'
     )
+
+  }
+
+  // ========================================
+  // CHECK AGAIN
+  // ========================================
+
+  if (
+    state?.creds?.registered
+  ) {
+
+    return {
+
+      alreadyRegistered: true,
+
+      code: null
+
+    }
+
   }
 
   pairingNumber = number
 
+  console.log('')
+  console.log('======================================')
   console.log(
-    `[${BOT_NAME}] 🔑 Requesting pairing code for ${number}`
+    `🔑 Requesting pairing code for ${number}`
   )
+  console.log('======================================')
 
-  // Pairing code يجب أن يكون socket غير مسجل
-  if (state?.creds?.registered) {
-    return {
-      alreadyRegistered: true,
-      code: null
-    }
-  }
+  // ========================================
+  // REQUEST CODE
+  // ========================================
 
-  const code = await sock.requestPairingCode(number)
+  const code =
+    await sock.requestPairingCode(number)
 
   pairingCode = code
 
@@ -426,250 +605,408 @@ async function getPairingCode(number) {
   console.log('')
 
   return {
+
     alreadyRegistered: false,
+
     code
+
   }
+
 }
 
-// ===============================
+// ==========================================
 // HOME
-// ===============================
+// ==========================================
 
 app.get('/', (req, res) => {
+
   res.json({
+
     success: true,
+
     name: BOT_NAME,
-    message: 'DAMAR-MD API is online 🚀',
-    status: connectionStatus,
-    pairing: '/api/pair?number=212XXXXXXXXX',
-    api: {
-      status: '/api/status',
-      pair: '/api/pair?number=212XXXXXXXXX'
+
+    message:
+      'DAMAR-MD API is online 🚀',
+
+    status:
+      connectionStatus,
+
+    endpoints: {
+
+      status:
+        '/api/status',
+
+      pair:
+        '/api/pair?number=212XXXXXXXXX'
+
     }
+
   })
+
 })
 
-// ===============================
+// ==========================================
 // STATUS
-// ===============================
+// ==========================================
 
-app.get('/api/status', (req, res) => {
-  res.json({
-    success: true,
-    bot: BOT_NAME,
-    status: connectionStatus,
-    connected: connectionStatus === 'connected',
-    registered: !!state?.creds?.registered,
-    number: pairingNumber || null,
-    pairingCode: pairingCode || null,
-    lastError
-  })
-})
+app.get(
+  '/api/status',
+  (req, res) => {
 
-// Alias
-app.get('/status', (req, res) => {
-  res.json({
-    success: true,
-    bot: BOT_NAME,
-    status: connectionStatus,
-    connected: connectionStatus === 'connected',
-    registered: !!state?.creds?.registered,
-    number: pairingNumber || null,
-    pairingCode: pairingCode || null,
-    lastError
-  })
-})
+    res.json({
 
-// ===============================
-// PAIRING CODE GET
-// ===============================
+      success: true,
 
-app.get('/api/pair', async (req, res) => {
-  try {
-    const number = cleanNumber(req.query.number)
+      bot: BOT_NAME,
 
-    if (!number) {
-      return res.status(400).json({
-        success: false,
-        error: 'ضع رقم الواتساب بدون +'
-      })
-    }
+      status:
+        connectionStatus,
 
-    const result = await getPairingCode(number)
+      connected:
+        connectionStatus === 'connected',
 
-    if (result.alreadyRegistered) {
+      registered:
+        !!state?.creds?.registered,
+
+      number:
+        pairingNumber || null,
+
+      pairingCode:
+        pairingCode || null,
+
+      lastError
+
+    })
+
+  }
+)
+
+// ==========================================
+// STATUS ALIAS
+// ==========================================
+
+app.get(
+  '/status',
+  (req, res) => {
+
+    res.json({
+
+      success: true,
+
+      bot: BOT_NAME,
+
+      status:
+        connectionStatus,
+
+      connected:
+        connectionStatus === 'connected',
+
+      registered:
+        !!state?.creds?.registered,
+
+      number:
+        pairingNumber || null,
+
+      pairingCode:
+        pairingCode || null,
+
+      lastError
+
+    })
+
+  }
+)
+
+// ==========================================
+// GET PAIR
+// ==========================================
+
+app.get(
+  '/api/pair',
+  async (req, res) => {
+
+    try {
+
+      const number =
+        cleanNumber(
+          req.query.number
+        )
+
+      if (!number) {
+
+        return res.status(400).json({
+
+          success: false,
+
+          error:
+            'ضع رقم الواتساب بدون +'
+
+        })
+
+      }
+
+      const result =
+        await getPairingCode(number)
+
+      if (
+        result.alreadyRegistered
+      ) {
+
+        return res.json({
+
+          success: true,
+
+          registered: true,
+
+          connected:
+            connectionStatus === 'connected',
+
+          message:
+            'هذا الرقم مربوط مسبقا بالجلسة'
+
+        })
+
+      }
+
       return res.json({
+
         success: true,
-        registered: true,
-        connected:
-          connectionStatus === 'connected',
+
+        registered: false,
+
+        number,
+
+        code: result.code,
+
+        pairingCode: result.code,
+
+        status:
+          connectionStatus,
+
         message:
-          'هذا الرقم مربوط مسبقا بالجلسة'
+          'دخل هذا الكود في WhatsApp > الأجهزة المرتبطة'
+
       })
-    }
 
-    return res.json({
-      success: true,
-      registered: false,
-      number,
-      code: result.code,
-      pairingCode: result.code,
-      status: connectionStatus,
-      message:
-        'دخل هذا الكود في WhatsApp > الأجهزة المرتبطة'
-    })
+    } catch (error) {
 
-  } catch (error) {
-    console.error(
-      `[${BOT_NAME}] ❌ Pairing error:`,
-      error
-    )
+      console.error(
+        `[${BOT_NAME}] ❌ Pairing error:`,
+        error
+      )
 
-    return res.status(500).json({
-      success: false,
-      error:
-        error?.message ||
-        'Failed to generate pairing code',
-      status: connectionStatus
-    })
-  }
-})
+      return res.status(500).json({
 
-// Alias /pair
-app.get('/pair', async (req, res) => {
-  try {
-    const number = cleanNumber(req.query.number)
-
-    if (!number) {
-      return res.status(400).json({
         success: false,
-        error: 'WhatsApp number required'
+
+        error:
+          error?.message ||
+          'Failed to generate pairing code',
+
+        status:
+          connectionStatus
+
       })
+
     }
 
-    const result = await getPairingCode(number)
-
-    return res.json({
-      success: true,
-      number,
-      code: result.code,
-      pairingCode: result.code,
-      registered: result.alreadyRegistered,
-      status: connectionStatus
-    })
-
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      error: error?.message || String(error)
-    })
   }
-})
+)
 
-// ===============================
+// ==========================================
 // POST PAIR
-// ===============================
+// ==========================================
 
-app.post('/api/pair', async (req, res) => {
-  try {
-    const number = cleanNumber(
-      req.body?.number
-    )
+app.post(
+  '/api/pair',
+  async (req, res) => {
 
-    if (!number) {
-      return res.status(400).json({
-        success: false,
-        error: 'WhatsApp number required'
+    try {
+
+      const number =
+        cleanNumber(
+          req.body?.number
+        )
+
+      if (!number) {
+
+        return res.status(400).json({
+
+          success: false,
+
+          error:
+            'WhatsApp number required'
+
+        })
+
+      }
+
+      const result =
+        await getPairingCode(number)
+
+      if (
+        result.alreadyRegistered
+      ) {
+
+        return res.json({
+
+          success: true,
+
+          registered: true,
+
+          connected:
+            connectionStatus === 'connected',
+
+          message:
+            'هذا الرقم مربوط مسبقا بالجلسة'
+
+        })
+
+      }
+
+      return res.json({
+
+        success: true,
+
+        number,
+
+        code: result.code,
+
+        pairingCode: result.code,
+
+        registered: false,
+
+        status:
+          connectionStatus,
+
+        message:
+          'دخل الكود في WhatsApp > الأجهزة المرتبطة'
+
       })
+
+    } catch (error) {
+
+      console.error(
+        `[${BOT_NAME}] POST pairing error:`,
+        error
+      )
+
+      return res.status(500).json({
+
+        success: false,
+
+        error:
+          error?.message ||
+          String(error),
+
+        status:
+          connectionStatus
+
+      })
+
     }
 
-    const result = await getPairingCode(number)
-
-    return res.json({
-      success: true,
-      number,
-      code: result.code,
-      pairingCode: result.code,
-      registered: result.alreadyRegistered,
-      status: connectionStatus
-    })
-
-  } catch (error) {
-    console.error(
-      `[${BOT_NAME}] POST pairing error:`,
-      error
-    )
-
-    return res.status(500).json({
-      success: false,
-      error: error?.message || String(error),
-      status: connectionStatus
-    })
   }
-})
+)
 
-// ===============================
+// ==========================================
 // HEALTH
-// ===============================
+// ==========================================
 
-app.get('/health', (req, res) => {
-  res.json({
-    ok: true,
-    bot: BOT_NAME,
-    status: connectionStatus,
-    uptime: process.uptime()
-  })
-})
+app.get(
+  '/health',
+  (req, res) => {
 
-// ===============================
+    res.json({
+
+      ok: true,
+
+      bot: BOT_NAME,
+
+      status:
+        connectionStatus,
+
+      uptime:
+        process.uptime()
+
+    })
+
+  }
+)
+
+// ==========================================
 // 404
-// ===============================
+// ==========================================
 
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'Endpoint not found',
-    bot: BOT_NAME
-  })
-})
+app.use(
+  (req, res) => {
 
-// ===============================
-// START SERVER
-// ===============================
+    res.status(404).json({
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log('')
-  console.log('======================================')
-  console.log(`🚀 ${BOT_NAME} API STARTED`)
-  console.log('======================================')
-  console.log(`📡 PORT: ${PORT}`)
-  console.log(`🌐 Railway PORT: ${process.env.PORT || 'auto'}`)
-  console.log(`📁 AUTH: ${AUTH_DIR}`)
-  console.log('======================================')
-})
+      success: false,
 
-// ===============================
+      error:
+        'Endpoint not found',
+
+      bot:
+        BOT_NAME
+
+    })
+
+  }
+)
+
+// ==========================================
+// SERVER
+// ==========================================
+
+app.listen(
+  PORT,
+  '0.0.0.0',
+  () => {
+
+    console.log('')
+    console.log('======================================')
+    console.log(`🚀 ${BOT_NAME} API STARTED`)
+    console.log('======================================')
+    console.log(`📡 PORT: ${PORT}`)
+    console.log(
+      `🌐 Railway PORT: ${process.env.PORT || 'auto'}`
+    )
+    console.log(`📁 AUTH: ${AUTH_DIR}`)
+    console.log('======================================')
+    console.log('')
+
+  }
+)
+
+// ==========================================
 // START WHATSAPP
-// ===============================
+// ==========================================
 
 startWhatsApp()
 
-// ===============================
-// SAFE SHUTDOWN
-// ===============================
+// ==========================================
+// SHUTDOWN
+// ==========================================
 
 async function shutdown(signal) {
+
   console.log(
     `[${BOT_NAME}] 🛑 ${signal} received`
   )
 
   try {
+
     if (sock) {
       sock.end(undefined)
     }
+
   } catch {}
 
   process.exit(0)
+
 }
 
 process.on(
@@ -685,19 +1022,23 @@ process.on(
 process.on(
   'uncaughtException',
   error => {
+
     console.error(
       `[${BOT_NAME}] ❌ UNCAUGHT EXCEPTION:`,
       error
     )
+
   }
 )
 
 process.on(
   'unhandledRejection',
   error => {
+
     console.error(
       `[${BOT_NAME}] ❌ UNHANDLED REJECTION:`,
       error
     )
+
   }
 )
