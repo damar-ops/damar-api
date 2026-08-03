@@ -1,14 +1,14 @@
 {
   "name": "damar-api",
   "version": "1.0.0",
-  "description": "DAMAR API with Baileys + Express",
+  "description": "DAMAR-MD WhatsApp Pairing API",
   "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.5",
