@@ -9,6 +9,16 @@ import path from "path";
 import pino from "pino";
 import { fileURLToPath } from "url";
 
+import makeWASocket, {
+  useMultiFileAuthState,
+  DisconnectReason
+} from "@whiskeysockets/baileys";
+
+
+/* =========================================
+   BASIC SETTINGS
+========================================= */
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -21,68 +31,75 @@ const AUTH_DIR = path.join(
   "auth_info"
 );
 
+
+/* =========================================
+   CREATE AUTH FOLDER
+========================================= */
+
 if (!fs.existsSync(AUTH_DIR)) {
   fs.mkdirSync(AUTH_DIR, {
     recursive: true
   });
 }
 
-app.use(cors({
-  origin: "*"
-}));
 
-app.use(express.json());
+/* =========================================
+   EXPRESS
+========================================= */
+
+app.use(
+  cors({
+    origin: "*"
+  })
+);
+
+app.use(
+  express.json()
+);
+
+
+/* =========================================
+   LOGGER
+========================================= */
 
 const logger = pino({
   level: "silent"
 });
 
+
+/* =========================================
+   WHATSAPP VARIABLES
+========================================= */
+
 let sock = null;
+
 let whatsappStatus = "starting";
+
 let connecting = false;
+
 let reconnectTimer = null;
 
-async function getBaileys() {
 
-  const B = await import(
-    "@whiskeysockets/baileys"
-  );
-
-  const makeWASocket =
-    B.default ||
-    B.makeWASocket;
-
-  const useMultiFileAuthState =
-    B.useMultiFileAuthState;
-
-  const DisconnectReason =
-    B.DisconnectReason;
-
-  return {
-    makeWASocket,
-    useMultiFileAuthState,
-    DisconnectReason
-  };
-}
+/* =========================================
+   START WHATSAPP
+========================================= */
 
 async function startWhatsApp() {
 
-  if (connecting) return;
+  if (connecting) {
+    return;
+  }
 
   connecting = true;
+
   whatsappStatus = "connecting";
 
+  console.log("");
+  console.log("=================================");
+  console.log("📱 جاري تشغيل WhatsApp...");
+  console.log("=================================");
+
   try {
-
-    console.log(
-      "📱 جاري تشغيل WhatsApp..."
-    );
-
-    const {
-      makeWASocket,
-      useMultiFileAuthState,
-      DisconnectReason
-    } = await getBaileys();
 
     const {
       state,
@@ -90,6 +107,7 @@ async function startWhatsApp() {
     } = await useMultiFileAuthState(
       AUTH_DIR
     );
+
 
     sock = makeWASocket({
 
@@ -105,14 +123,26 @@ async function startWhatsApp() {
         "1.0.0"
       ],
 
-      markOnlineOnConnect: false
+      markOnlineOnConnect: false,
+
+      syncFullHistory: false
 
     });
+
+
+    /*
+      حفظ بيانات تسجيل الدخول
+    */
 
     sock.ev.on(
       "creds.update",
       saveCreds
     );
+
+
+    /*
+      حالة الاتصال
+    */
 
     sock.ev.on(
       "connection.update",
@@ -123,6 +153,7 @@ async function startWhatsApp() {
           lastDisconnect
         } = update;
 
+
         if (connection) {
 
           console.log(
@@ -132,18 +163,35 @@ async function startWhatsApp() {
 
         }
 
+
+        /*
+          متصل
+        */
+
         if (connection === "open") {
 
           connecting = false;
 
-          whatsappStatus =
-            "connected";
+          whatsappStatus = "connected";
 
+          console.log("");
+          console.log(
+            "================================="
+          );
           console.log(
             "✅ WhatsApp Connected"
           );
+          console.log(
+            "================================="
+          );
+          console.log("");
 
         }
+
+
+        /*
+          انقطع الاتصال
+        */
 
         if (connection === "close") {
 
@@ -152,52 +200,83 @@ async function startWhatsApp() {
           whatsappStatus =
             "disconnected";
 
+
           const error =
             lastDisconnect?.error;
+
 
           const statusCode =
             error?.output?.statusCode ||
             error?.data?.statusCode ||
             error?.statusCode;
 
-          console.error(
+
+          console.log("");
+          console.log(
             "❌ WhatsApp disconnected"
           );
 
-          console.error(
+
+          console.log(
             "STATUS CODE:",
             statusCode || "unknown"
           );
 
-          console.error(
-            "ERROR MESSAGE:",
+
+          console.log(
+            "ERROR:",
             error?.message ||
             String(error)
           );
 
+
+          /*
+            إذا الحساب تسجل خروج
+          */
+
           if (
             statusCode ===
-            DisconnectReason?.loggedOut
+            DisconnectReason.loggedOut
           ) {
 
             console.log(
-              "⚠️ WhatsApp logged out"
+              "⚠️ الحساب خرج من WhatsApp."
+            );
+
+            console.log(
+              "احذف auth_info ثم أعد التشغيل."
             );
 
             return;
+
           }
 
+
+          /*
+            إعادة الاتصال
+          */
+
           if (reconnectTimer) {
+
             clearTimeout(
               reconnectTimer
             );
+
           }
+
 
           reconnectTimer =
             setTimeout(
               () => {
+
                 reconnectTimer = null;
+
+                console.log(
+                  "🔄 إعادة تشغيل WhatsApp..."
+                );
+
                 startWhatsApp();
+
               },
               10000
             );
@@ -207,13 +286,15 @@ async function startWhatsApp() {
       }
     );
 
+
   } catch (error) {
 
     connecting = false;
 
-    whatsappStatus =
-      "error";
+    whatsappStatus = "error";
 
+
+    console.error("");
     console.error(
       "❌ WhatsApp startup error:"
     );
@@ -222,11 +303,28 @@ async function startWhatsApp() {
       error
     );
 
+
+    /*
+      إعادة المحاولة
+    */
+
+    if (reconnectTimer) {
+
+      clearTimeout(
+        reconnectTimer
+      );
+
+    }
+
+
     reconnectTimer =
       setTimeout(
         () => {
+
           reconnectTimer = null;
+
           startWhatsApp();
+
         },
         10000
       );
@@ -236,15 +334,16 @@ async function startWhatsApp() {
 }
 
 
-/* ===============================
-   API HOME
-================================ */
+/* =========================================
+   HOME PAGE
+========================================= */
 
 app.get(
   "/",
   (req, res) => {
 
     res.send(`
+
 <!DOCTYPE html>
 
 <html lang="ar" dir="rtl">
@@ -253,239 +352,515 @@ app.get(
 
 <meta charset="UTF-8">
 
-<meta name="viewport"
-content="width=device-width,initial-scale=1">
+<meta
+name="viewport"
+content="width=device-width, initial-scale=1.0"
+>
 
 <title>DAMAR-MD</title>
 
+
 <style>
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  background: #09060f;
-  color: white;
-  font-family: Arial;
-  display: flex;
-  justify-content: center;
-  padding: 25px 10px;
+* {
+  box-sizing: border-box;
 }
+
+body {
+
+  margin: 0;
+
+  min-height: 100vh;
+
+  background:
+    radial-gradient(
+      circle at top,
+      #271044,
+      #09060f 55%
+    );
+
+  color: white;
+
+  font-family:
+    Arial,
+    sans-serif;
+
+  padding: 25px 12px;
+
+}
+
 
 .container {
+
   width: 100%;
-  max-width: 520px;
-  background: #111;
-  border: 2px solid #a33cff;
+
+  max-width: 550px;
+
+  margin: auto;
+
+  background: #111111;
+
+  border: 2px solid #a83cff;
+
   border-radius: 25px;
+
   padding: 25px;
-  box-shadow: 0 0 30px #7b20ff;
+
+  box-shadow:
+    0 0 25px #751cff;
+
 }
+
+
+.logo {
+
+  width: 120px;
+
+  height: 120px;
+
+  border-radius: 50%;
+
+  display: block;
+
+  margin: auto;
+
+  object-fit: cover;
+
+  border: 4px solid #00d9ff;
+
+}
+
 
 h1 {
+
   text-align: center;
-  color: red;
+
+  color: #ff1111;
+
   font-size: 38px;
+
+  margin-bottom: 8px;
+
 }
+
 
 .subtitle {
+
   text-align: center;
-  color: #d33;
+
+  color: #d94343;
+
+  font-size: 17px;
+
 }
+
 
 .box {
-  margin-top: 25px;
+
+  margin-top: 30px;
+
   border: 2px solid #963cff;
+
   border-radius: 20px;
+
   padding: 20px;
+
 }
+
 
 label {
+
   display: block;
-  margin: 15px 0 8px;
+
+  font-size: 18px;
+
+  margin-top: 12px;
+
+  margin-bottom: 8px;
+
 }
+
 
 input {
+
   width: 100%;
-  padding: 15px;
-  box-sizing: border-box;
-  background: #222;
-  color: white;
+
+  padding: 16px;
+
+  border-radius: 13px;
+
   border: 2px solid #444;
-  border-radius: 12px;
+
+  background: #222;
+
+  color: white;
+
   font-size: 18px;
+
+  outline: none;
+
+  direction: ltr;
+
+  text-align: center;
+
 }
+
 
 button {
+
   width: 100%;
-  border: 0;
-  color: white;
+
   padding: 17px;
+
+  margin-top: 18px;
+
+  border: none;
+
   border-radius: 14px;
-  margin-top: 15px;
+
+  color: white;
+
   font-size: 19px;
+
   font-weight: bold;
+
+  cursor: pointer;
+
 }
+
 
 .pair {
-  background: linear-gradient(
-    90deg,
-    #a33cff,
-    #6330ff
-  );
+
+  background:
+    linear-gradient(
+      90deg,
+      #a83cff,
+      #5930ff
+    );
+
 }
+
 
 .status {
-  text-align: center;
+
   margin-top: 20px;
+
+  padding: 14px;
+
   background: #1b1b1b;
-  padding: 15px;
+
   border-radius: 12px;
+
+  text-align: center;
+
+  font-size: 17px;
+
 }
+
 
 .result {
+
   margin-top: 20px;
-  text-align: center;
+
   background: #1b1b1b;
-  padding: 20px;
+
   border-radius: 15px;
+
+  padding: 20px;
+
+  text-align: center;
+
 }
 
+
 .code {
+
   direction: ltr;
-  color: #00eaff;
-  font-size: 30px;
+
+  font-size: 32px;
+
   font-weight: bold;
-  margin-top: 15px;
+
+  color: #00eaff;
+
+  letter-spacing: 4px;
+
+  margin: 15px 0;
+
 }
+
+
+.help {
+
+  color: #aaa;
+
+  line-height: 1.8;
+
+}
+
+
+.footer {
+
+  text-align: center;
+
+  margin-top: 25px;
+
+  color: #777;
+
+}
+
 
 </style>
 
 </head>
 
+
 <body>
+
 
 <div class="container">
 
+
 <h1>DAMAR-MD</h1>
 
+
 <div class="subtitle">
-جيب كود الربط وربط البوت
+
+🔑 جيب كود الربط وربط البوت
+
 </div>
 
-<div id="status"
-class="status">
+
+<div
+id="status"
+class="status"
+>
+
 🟡 جاري تشغيل WhatsApp...
+
 </div>
+
 
 <div class="box">
 
+
 <label>
+
 📱 نمرة الواتساب
+
 </label>
 
+
 <input
+
 id="phone"
+
 type="tel"
-placeholder="212633226499">
+
+placeholder="212633226499"
+
+autocomplete="off"
+
+
+>
+
 
 <button
+
 class="pair"
-onclick="pair()">
+
+onclick="getCode()"
+
+>
 
 🔑 جيب كود الربط
 
 </button>
 
+
 <div
+
 id="result"
+
 class="result"
-style="display:none">
+
+style="display:none"
+
+>
+
+
+<div>
 
 🔑 كود الربط
 
+</div>
+
+
 <div
+
 id="code"
-class="code">
+
+class="code"
+
+>
+
 --------
-</div>
-
-<p id="msg"></p>
 
 </div>
 
-</div>
+
+<div
+
+id="message"
+
+class="help"
+
+>
 
 </div>
+
+
+</div>
+
+
+</div>
+
+
+<div class="footer">
+
+DAMAR-MD © 2026
+
+</div>
+
+
+</div>
+
 
 <script>
 
-const API =
-"https://damar-api-production.up.railway.app";
 
-async function status() {
+async function checkStatus() {
 
   try {
 
-    const r =
+    const response =
       await fetch(
-        API + "/health"
+        "/health"
       );
 
-    const d =
-      await r.json();
+
+    const data =
+      await response.json();
+
+
+    const element =
+      document.getElementById(
+        "status"
+      );
+
+
+    if (
+      data.whatsapp ===
+      "connected"
+    ) {
+
+      element.innerText =
+        "🟢 WhatsApp متصل";
+
+    }
+
+    else if (
+      data.whatsapp ===
+      "connecting"
+    ) {
+
+      element.innerText =
+        "🟡 WhatsApp كيتصل...";
+
+    }
+
+    else {
+
+      element.innerText =
+        "🔴 WhatsApp: " +
+        data.whatsapp;
+
+    }
+
+
+  } catch (error) {
 
     document.getElementById(
       "status"
     ).innerText =
-      d.whatsapp === "connected"
-      ? "🟢 WhatsApp متصل"
-      : "🟡 WhatsApp: "
-        + d.whatsapp;
-
-  } catch {
-
-    document.getElementById(
-      "status"
-    ).innerText =
-      "🔴 Failed to fetch";
+      "🔴 API غير متاحة";
 
   }
 
 }
 
-async function pair() {
+
+/* =================================
+   GET PAIRING CODE
+================================= */
+
+async function getCode() {
+
 
   let phone =
-    document.getElementById(
-      "phone"
-    ).value
-    .replace(/\\D/g, "");
+    document
+      .getElementById("phone")
+      .value
+      .replace(/\\D/g, "");
+
 
   if (!phone) {
 
     alert(
-      "دخل رقم الواتساب"
+      "دخل رقم WhatsApp أولا"
     );
 
     return;
+
   }
 
-  document.getElementById(
-    "result"
-  ).style.display =
+
+  const result =
+    document.getElementById(
+      "result"
+    );
+
+  const code =
+    document.getElementById(
+      "code"
+    );
+
+  const message =
+    document.getElementById(
+      "message"
+    );
+
+
+  result.style.display =
     "block";
 
-  document.getElementById(
-    "code"
-  ).innerText =
+
+  code.innerText =
     "⏳";
+
+
+  message.innerText =
+    "جاري طلب كود الربط...";
+
 
   try {
 
-    const r =
+
+    const response =
       await fetch(
-        API + "/pairing-code",
+        "/pairing-code",
         {
+
           method: "POST",
 
           headers: {
@@ -493,86 +868,102 @@ async function pair() {
               "application/json"
           },
 
-          body: JSON.stringify({
-            phone
-          })
+          body:
+            JSON.stringify({
+              phone: phone
+            })
+
         }
       );
 
-    const d =
-      await r.json();
 
-    if (!d.success) {
+    const data =
+      await response.json();
+
+
+    if (!response.ok) {
 
       throw new Error(
-        d.message ||
-        d.error ||
-        "فشل الربط"
+        data.message ||
+        "وقع خطأ"
       );
 
     }
 
-    if (d.alreadyPaired) {
 
-      document.getElementById(
-        "code"
-      ).innerText = "✓";
+    if (
+      data.alreadyPaired
+    ) {
 
-      document.getElementById(
-        "msg"
-      ).innerText =
-        "الجهاز مربوط من قبل";
+      code.innerText =
+        "✓";
+
+
+      message.innerText =
+        "هذا الحساب مربوط من قبل.";
 
       return;
+
     }
 
-    document.getElementById(
-      "code"
-    ).innerText =
-      d.code;
 
-    document.getElementById(
-      "msg"
-    ).innerText =
-      "دخل WhatsApp → الأجهزة المرتبطة → ربط جهاز → الربط برقم الهاتف";
+    code.innerText =
+      data.code ||
+      "--------";
 
-  } catch (e) {
 
-    document.getElementById(
-      "code"
-    ).innerText =
+    message.innerText =
+      "دخل WhatsApp → الأجهزة المرتبطة → ربط جهاز → الربط برقم الهاتف، ثم دخل الكود.";
+
+  }
+
+
+  catch (error) {
+
+
+    code.innerText =
       "❌";
 
-    document.getElementById(
-      "msg"
-    ).innerText =
-      e.message;
+
+    message.innerText =
+      error.message ||
+      "فشل الحصول على الكود";
+
 
   }
 
 }
 
-status();
+
+/* =================================
+   CHECK EVERY 5 SECONDS
+================================= */
+
+checkStatus();
+
 
 setInterval(
-  status,
-  10000
+  checkStatus,
+  5000
 );
 
+
 </script>
+
 
 </body>
 
 </html>
+
 `);
 
   }
 );
 
 
-/* ===============================
-   HEALTH
-================================ */
+/* =========================================
+   HEALTH API
+========================================= */
 
 app.get(
   "/health",
@@ -597,26 +988,35 @@ app.get(
 );
 
 
-/* ===============================
-   PAIRING CODE
-================================ */
+/* =========================================
+   PAIRING CODE API
+========================================= */
 
 app.post(
   "/pairing-code",
   async (req, res) => {
 
+
     try {
+
 
       let phone =
         String(
           req.body?.phone || ""
         );
 
+
+      /*
+        حذف أي رموز
+        + - مسافات
+      */
+
       phone =
         phone.replace(
           /\D/g,
           ""
         );
+
 
       if (!phone) {
 
@@ -627,11 +1027,23 @@ app.post(
             success: false,
 
             message:
-              "دخل رقم الواتساب"
+              "رقم WhatsApp غير صحيح"
 
           });
 
       }
+
+
+      /*
+        إذا لم يبدأ بـ +
+        Baileys يحتاج الرقم بدون +
+      */
+
+      console.log(
+        "📱 طلب كود للرقم:",
+        phone
+      );
+
 
       if (!sock) {
 
@@ -642,11 +1054,16 @@ app.post(
             success: false,
 
             message:
-              "WhatsApp مازال كيتشغل، عاود بعد قليل"
+              "WhatsApp مازال كيتشغل، تسنى شوية وجرب من جديد."
 
           });
 
       }
+
+
+      /*
+        الحساب مربوط من قبل
+      */
 
       if (
         sock.authState?.creds?.registered
@@ -662,37 +1079,49 @@ app.post(
 
       }
 
-      console.log(
-        "📱 Pairing request:",
-        phone
-      );
+
+      /*
+        طلب Pairing Code
+      */
 
       const code =
         await sock.requestPairingCode(
           phone
         );
 
+
       console.log(
-        "🔑 Pairing code:",
+        "🔑 Pairing Code:",
         code
       );
 
-      res.json({
+
+      return res.json({
 
         success: true,
 
-        code
+        code: code
 
       });
 
-    } catch (error) {
+
+    }
+
+
+    catch (error) {
+
 
       console.error(
-        "❌ Pairing error:",
+        "❌ Pairing error:"
+      );
+
+
+      console.error(
         error
       );
 
-      res
+
+      return res
         .status(500)
         .json({
 
@@ -700,9 +1129,10 @@ app.post(
 
           message:
             error?.message ||
-            String(error)
+            "فشل الحصول على كود الربط"
 
         });
+
 
     }
 
@@ -710,17 +1140,27 @@ app.post(
 );
 
 
-/* ===============================
-   SERVER
-================================ */
+/* =========================================
+   START SERVER
+========================================= */
 
 app.listen(
   PORT,
   "0.0.0.0",
   () => {
 
+
+    console.log("");
+    console.log(
+      "======================================"
+    );
+
     console.log(
       "🚀 DAMAR-API STARTED"
+    );
+
+    console.log(
+      "======================================"
     );
 
     console.log(
@@ -732,6 +1172,17 @@ app.listen(
       "URL:",
       "https://damar-api-production.up.railway.app"
     );
+
+    console.log(
+      "======================================"
+    );
+
+    console.log("");
+
+
+    /*
+      تشغيل WhatsApp
+    */
 
     startWhatsApp();
 
