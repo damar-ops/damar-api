@@ -4,7 +4,7 @@ import os from 'os'
 const NEW_DAYS = 30
 
 // 🎵 صوت المنيو
-const MENU_AUDIO = 'https://files.catbox.moe/9ac75j.mp3'
+const MENU_AUDIO = 'https://litter.catbox.moe/yn9qew.opus'
 
 // 👤 Facebook المطور
 const DEVELOPER_FACEBOOK =
