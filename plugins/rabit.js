@@ -1,789 +1,341 @@
-/**
- * ╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
- *       🔗 RABIT - DAMAR-MD
- * ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
- *
- * .rabit
- *
- * Reply على:
- * 🎙️ Vocal WhatsApp
- * 🎵 Audio
- * 🖼️ Image
- * 🎬 Video
- *
- * يرفع الميديا مباشرة إلى Catbox
- *
- * ❌ بدون FFmpeg
- * ❌ بدون تحويل
- * ✅ Vocal يبقى Opus
- */
+// ==========================================================
+// DAMAR-MD | CATBOX UPLOADER
+// Command: .Rabit
+// Developer: ابو دمار شامل
+// ==========================================================
 
-const MAX_SIZE = 200 * 1024 * 1024
-const SESSION_TIME = 5 * 60 * 1000
+import axios from "axios"
+import { fileTypeFromBuffer } from "file-type"
 
-const sessions = new Map()
+// Catbox API
+const CATBOX_API = "https://catbox.moe/user/api.php"
 
-
-// ═══════════════════════════════
-// Session
-// ═══════════════════════════════
-
-function getKey(m) {
-    return `${m.chat}:${m.sender}`
-}
-
-
-function cleanSessions() {
-
-    const now = Date.now()
-
-    for (const [key, data] of sessions.entries()) {
-
-        if (
-            now - data.time >
-            SESSION_TIME
-        ) {
-            sessions.delete(key)
-        }
-    }
-}
-
-
-// ═══════════════════════════════
-// اكتشاف نوع الميديا
-// ═══════════════════════════════
-
-function getMediaInfo(m) {
-
-    if (!m) return null
-
-    /*
-     * بعض نسخ البوتات كتخزن النوع هنا:
-     *
-     * m.mtype
-     */
-
-    const mtype = m.mtype || ''
-
-    /*
-     * وبعض النسخ:
-     *
-     * m.msg
-     */
-
-    const msg = m.msg || {}
-
-    /*
-     * وبعض نسخ quoted:
-     *
-     * m.message
-     */
-
-    const message = m.message || {}
-
-    /*
-     * وبعض النسخ:
-     *
-     * m.quoted.message
-     */
-
-    const quotedMessage =
-        m.quoted?.message || {}
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━
-    // Audio
-    // ━━━━━━━━━━━━━━━━━━━━━━━
-
-    const audio =
-        mtype === 'audioMessage' ||
-        !!msg.audioMessage ||
-        !!message.audioMessage ||
-        !!quotedMessage.audioMessage ||
-        !!m.audioMessage
-
-    if (audio) {
-
-        const audioMsg =
-            msg.audioMessage ||
-            message.audioMessage ||
-            quotedMessage.audioMessage ||
-            m.audioMessage ||
-            msg
-
-        const ptt =
-            audioMsg?.ptt === true ||
-            msg?.ptt === true ||
-            m?.ptt === true
-
-        const mimetype =
-            audioMsg?.mimetype ||
-            msg?.mimetype ||
-            m?.mimetype ||
-            'audio/ogg; codecs=opus'
-
-        /*
-         * WhatsApp Vocal
-         */
-
-        if (
-            ptt ||
-            mimetype.includes('opus') ||
-            mimetype.includes('ogg')
-        ) {
-
-            return {
-                type: 'voice',
-                name: 'DAMAR-MD.opus',
-                ext: 'opus',
-                mime: 'audio/ogg; codecs=opus'
-            }
-        }
-
-        /*
-         * Audio عادي
-         */
-
-        return {
-            type: 'audio',
-            name: 'DAMAR-MD.audio',
-            ext: 'audio',
-            mime: mimetype
-        }
+// ----------------------------------------------------------
+// رفع Buffer إلى Catbox
+// ----------------------------------------------------------
+async function uploadToCatbox(buffer, fileName, mimeType) {
+    if (!buffer || !buffer.length) {
+        throw new Error("الملف فارغ")
     }
 
-
-    // ═══════════════════════════════
-    // Image
-    // ═══════════════════════════════
-
-    const image =
-        mtype === 'imageMessage' ||
-        !!msg.imageMessage ||
-        !!message.imageMessage ||
-        !!quotedMessage.imageMessage ||
-        !!m.imageMessage
-
-    if (image) {
-
-        return {
-            type: 'image',
-            name: 'DAMAR-MD.jpg',
-            ext: 'jpg',
-            mime: 'image/jpeg'
-        }
-    }
-
-
-    // ═══════════════════════════════
-    // Video
-    // ═══════════════════════════════
-
-    const video =
-        mtype === 'videoMessage' ||
-        !!msg.videoMessage ||
-        !!message.videoMessage ||
-        !!quotedMessage.videoMessage ||
-        !!m.videoMessage
-
-    if (video) {
-
-        return {
-            type: 'video',
-            name: 'DAMAR-MD.mp4',
-            ext: 'mp4',
-            mime: 'video/mp4'
-        }
-    }
-
-
-    // ═══════════════════════════════
-    // fallback حسب mimetype
-    // ═══════════════════════════════
-
-    const mimetype =
-        m.mimetype ||
-        msg.mimetype ||
-        m.quoted?.mimetype ||
-        ''
-
-    if (
-        typeof mimetype === 'string' &&
-        mimetype.startsWith('audio/')
-    ) {
-
-        const isVoice =
-            m.ptt === true ||
-            msg.ptt === true ||
-            m.quoted?.ptt === true ||
-            mimetype.includes('opus') ||
-            mimetype.includes('ogg')
-
-        if (isVoice) {
-
-            return {
-                type: 'voice',
-                name: 'DAMAR-MD.opus',
-                ext: 'opus',
-                mime: 'audio/ogg; codecs=opus'
-            }
-        }
-
-        return {
-            type: 'audio',
-            name: 'DAMAR-MD.audio',
-            ext: 'audio',
-            mime: mimetype
-        }
-    }
-
-
-    return null
-}
-
-
-// ═══════════════════════════════
-// Catbox Upload
-// ═══════════════════════════════
-
-async function uploadCatbox(buffer, filename) {
-
-    if (!buffer) {
-        throw new Error(
-            'ما قدرتش نحمل الميديا.'
-        )
-    }
-
-    if (!Buffer.isBuffer(buffer)) {
-        throw new Error(
-            'بيانات الميديا غير صالحة.'
-        )
-    }
-
-    if (buffer.length === 0) {
-        throw new Error(
-            'الملف فارغ.'
-        )
-    }
-
-    if (buffer.length > MAX_SIZE) {
-        throw new Error(
-            'حجم الملف أكبر من 200MB.'
-        )
-    }
-
-
+    // Node.js 18+ فيه FormData و Blob بشكل مدمج
     const form = new FormData()
 
-    form.append(
-        'reqtype',
-        'fileupload'
-    )
+    form.append("reqtype", "fileupload")
 
-    form.append(
-        'fileToUpload',
-        new Blob([buffer]),
-        filename
-    )
-
-
-    const response = await fetch(
-        'https://catbox.moe/user/api.php',
+    const blob = new Blob(
+        [buffer],
         {
-            method: 'POST',
-            body: form,
-
-            headers: {
-                'User-Agent':
-                    'DAMAR-MD-RABIT/1.0'
-            }
+            type: mimeType || "application/octet-stream"
         }
     )
 
+    form.append(
+        "fileToUpload",
+        blob,
+        fileName
+    )
 
-    const result =
-        (await response.text()).trim()
+    const response = await axios.post(
+        CATBOX_API,
+        form,
+        {
+            timeout: 120000,
+            maxBodyLength: Infinity,
+            maxContentLength: Infinity,
+            headers: {
+                ...Object.fromEntries(form.entries())
+            },
+            validateStatus: () => true
+        }
+    )
 
+    const result = String(
+        response.data || ""
+    ).trim()
 
-    if (!response.ok) {
+    console.log(
+        "CATBOX STATUS:",
+        response.status
+    )
 
-        throw new Error(
-            `Catbox HTTP ${response.status}`
-        )
-    }
-
-
-    if (!result) {
-
-        throw new Error(
-            'Catbox ما رجع حتى رابط.'
-        )
-    }
-
+    console.log(
+        "CATBOX RESPONSE:",
+        result
+    )
 
     if (
-        !result.startsWith('http')
+        response.status < 200 ||
+        response.status >= 300
     ) {
-
         throw new Error(
-            `Catbox رجع رد غير صالح:\n${result}`
+            `Catbox HTTP ${response.status}: ${result}`
         )
     }
 
+    if (
+        !result.startsWith(
+            "https://files.catbox.moe/"
+        )
+    ) {
+        throw new Error(
+            `Catbox رفض الرفع: ${result}`
+        )
+    }
 
     return result
 }
 
+// ----------------------------------------------------------
+// معرفة الملف المرفق
+// ----------------------------------------------------------
+function getQuotedMedia(m) {
+    if (!m.quoted) return null
 
-// ═══════════════════════════════
-// تحميل الميديا
-// ═══════════════════════════════
+    const msg = m.quoted
 
-async function downloadMedia(m) {
+    const mime =
+        msg.mimetype ||
+        msg.msg?.mimetype ||
+        ""
 
-    /*
-     * الطريقة العادية
-     */
+    const type =
+        msg.mtype ||
+        msg.type ||
+        ""
 
     if (
-        typeof m.download === 'function'
+        mime.startsWith("image/")
     ) {
-
-        const buffer =
-            await m.download()
-
-        if (buffer) {
-            return buffer
+        return {
+            type: "image",
+            mime,
+            message: msg
         }
     }
 
+    if (
+        mime.startsWith("audio/")
+    ) {
+        return {
+            type: "audio",
+            mime,
+            message: msg
+        }
+    }
 
-    /*
-     * بعض النسخ كتستعمل downloadMediaMessage
-     * ولكن غالباً download() كافية.
-     */
+    if (
+        type === "imageMessage"
+    ) {
+        return {
+            type: "image",
+            mime:
+                "image/jpeg",
+            message: msg
+        }
+    }
 
-    throw new Error(
-        'البوت ما قدرش يحمل الميديا من WhatsApp.'
-    )
+    if (
+        type === "audioMessage"
+    ) {
+        return {
+            type: "audio",
+            mime:
+                "audio/ogg; codecs=opus",
+            message: msg
+        }
+    }
+
+    return null
 }
 
-
-// ═══════════════════════════════
-// معالجة الميديا
-// ═══════════════════════════════
-
-async function processMedia(m) {
-
-    const info =
-        getMediaInfo(m)
-
-
-    if (!info) {
-
-        throw new Error(
-            'ما قدرتش نتعرف على نوع الميديا.'
-        )
+// ----------------------------------------------------------
+// Extension
+// ----------------------------------------------------------
+function getExtension(type, mime, detected) {
+    if (type === "image") {
+        return "jpg"
     }
 
+    if (type === "audio") {
+        // إذا كان Audio WhatsApp بصيغة Opus
+        if (
+            mime.includes("opus") ||
+            mime.includes("ogg")
+        ) {
+            return "opus"
+        }
 
-    const buffer =
-        await downloadMedia(m)
+        if (detected?.ext === "opus") {
+            return "opus"
+        }
 
-
-    if (!buffer) {
-
-        throw new Error(
-            'الميديا ما تحمّلاتش.'
-        )
+        // لا نكذب على الملف:
+        // إذا لم يكن Opus، نستعمل الامتداد الحقيقي
+        return detected?.ext || "bin"
     }
 
-
-    let filename =
-        info.name
-
-
-    /*
-     * Vocal WhatsApp
-     *
-     * يبقى Opus
-     */
-
-    if (info.type === 'voice') {
-
-        filename =
-            'DAMAR-MD.opus'
-    }
-
-
-    /*
-     * إذا كان Audio بصيغة OGG/Opus
-     * كذلك نخليه .opus
-     */
-
-    if (
-        info.type === 'audio' &&
-        (
-            info.mime.includes('opus') ||
-            info.mime.includes('ogg')
-        )
-    ) {
-
-        filename =
-            'DAMAR-MD.opus'
-    }
-
-
-    const url =
-        await uploadCatbox(
-            buffer,
-            filename
-        )
-
-
-    return {
-        info,
-        url,
-        size: buffer.length,
-        filename
-    }
+    return detected?.ext || "bin"
 }
 
-
-// ═══════════════════════════════
-// شكل النتيجة
-// ═══════════════════════════════
-
-function resultText(result) {
-
-    let type =
-        '📁 ملف'
-
-
-    if (
-        result.info.type === 'voice'
-    ) {
-
-        type =
-            '🎙️ فوكال WhatsApp'
-    }
-
-
-    if (
-        result.info.type === 'audio'
-    ) {
-
-        type =
-            '🎵 أوديو'
-    }
-
-
-    if (
-        result.info.type === 'image'
-    ) {
-
-        type =
-            '🖼️ صورة'
-    }
-
-
-    if (
-        result.info.type === 'video'
-    ) {
-
-        type =
-            '🎬 فيديو'
-    }
-
-
-    return `
-╭━━━〔 🔗 RABIT - DAMAR-MD 〕━━━╮
-┃
-┃ ✅ تم الرفع بنجاح
-┃
-┃ ${type}
-┃
-┃ 📦 الحجم:
-┃ ${(result.size / 1024 / 1024).toFixed(2)} MB
-┃
-┃ 📄 الملف:
-┃ ${result.filename}
-┃
-┃ 🔗 الرابط:
-┃
-┃ ${result.url}
-┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-`
-}
-
-
-// ═══════════════════════════════
-// القائمة
-// ═══════════════════════════════
-
-function menu() {
-
-    return `
-╭━━━〔 🔗 RABIT - DAMAR-MD 〕━━━╮
-┃
-┃ 📥 طاكّي على الميديا أو جاوب
-┃ عليها بـ:
-┃
-┃ 🖼️ صورة
-┃ 🎬 فيديو
-┃ 🎵 أوديو
-┃ 🎙️ فوكال
-┃
-┃ 🔗 وسيتم إعطاؤك رابط Catbox
-┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-`
-}
-
-
-// ═══════════════════════════════
+// ----------------------------------------------------------
 // Handler
-// ═══════════════════════════════
+// ----------------------------------------------------------
+const handler = async (m, { conn }) => {
+    try {
+        await m.react("⏳")
 
-const handler = async (
-    m,
-    {
-        conn,
-        text
-    }
-) => {
+        // --------------------------------------------------
+        // خاص المستخدم يكون راد على صورة أو Audio
+        // --------------------------------------------------
+        const media = getQuotedMedia(m)
 
-    cleanSessions()
-
-    const key =
-        getKey(m)
-
-
-    // ═══════════════════════════════
-    // Reply على الميديا
-    // ═══════════════════════════════
-
-    if (m.quoted) {
-
-        const info =
-            getMediaInfo(m.quoted)
-
-
-        if (info) {
-
-            try {
-
-                await m.reply(
-                    '⏳ جاري رفع الميديا إلى Catbox...'
-                )
-
-
-                const result =
-                    await processMedia(
-                        m.quoted
-                    )
-
-
-                sessions.delete(key)
-
-
-                return m.reply(
-                    resultText(result)
-                )
-
-
-            } catch (error) {
-
-                console.error(
-                    '[RABIT REPLY ERROR]',
-                    error
-                )
-
-
-                return m.reply(`
-❌ فشل الرفع.
-
-📌 السبب:
-${error.message}
-`)
-            }
-        }
-    }
-
-
-    // ═══════════════════════════════
-    // إذا الميديا جات مباشرة
-    // ═══════════════════════════════
-
-    const direct =
-        getMediaInfo(m)
-
-
-    if (direct) {
-
-        try {
-
-            await m.reply(
-                '⏳ جاري رفع الميديا إلى Catbox...'
-            )
-
-
-            const result =
-                await processMedia(m)
-
-
-            sessions.delete(key)
-
+        if (!media) {
+            await m.react("❌")
 
             return m.reply(
-                resultText(result)
+                "⚠️ *DAMAR-MD CATBOX*\n\n" +
+                "خاصك ترد على صورة أو Audio بـ:\n\n" +
+                "📌 *.Rabit*\n\n" +
+                "🖼️ صورة → رابط `.jpg`\n" +
+                "🎵 Audio/Voice → رابط `.opus`"
             )
-
-
-        } catch (error) {
-
-            console.error(
-                '[RABIT DIRECT ERROR]',
-                error
-            )
-
-
-            return m.reply(`
-❌ فشل الرفع.
-
-📌 السبب:
-${error.message}
-`)
         }
-    }
 
+        // --------------------------------------------------
+        // Download media
+        // --------------------------------------------------
+        let buffer
 
-    // ═══════════════════════════════
-    // .rabit بدون ميديا
-    // ═══════════════════════════════
+        try {
+            if (
+                typeof media.message.download ===
+                "function"
+            ) {
+                buffer =
+                    await media.message.download()
+            } else if (
+                typeof m.quoted.download ===
+                "function"
+            ) {
+                buffer =
+                    await m.quoted.download()
+            } else {
+                throw new Error(
+                    "download() غير موجود"
+                )
+            }
+        } catch (downloadError) {
+            console.error(
+                "MEDIA DOWNLOAD ERROR:",
+                downloadError
+            )
 
-    sessions.set(key, {
+            throw new Error(
+                "ماقدرتش نحمل الملف من WhatsApp"
+            )
+        }
 
-        step: 'waiting',
-        time: Date.now()
+        if (
+            !buffer ||
+            !Buffer.isBuffer(buffer) ||
+            buffer.length === 0
+        ) {
+            throw new Error(
+                "الملف اللي تحمل فارغ"
+            )
+        }
 
-    })
+        // --------------------------------------------------
+        // Detect real file
+        // --------------------------------------------------
+        let detected = null
 
+        try {
+            detected =
+                await fileTypeFromBuffer(buffer)
+        } catch {}
 
-    return m.reply(
-        menu()
-    )
-}
+        const extension =
+            getExtension(
+                media.type,
+                media.mime,
+                detected
+            )
 
+        // --------------------------------------------------
+        // Image always JPG filename
+        // --------------------------------------------------
+        let fileName
 
-// ═══════════════════════════════
-// استقبال الميديا من بعد .rabit
-// ═══════════════════════════════
+        if (media.type === "image") {
+            fileName =
+                `damar_${Date.now()}.jpg`
+        } else {
+            fileName =
+                `damar_${Date.now()}.${extension}`
+        }
 
-handler.before = async function (m) {
+        // --------------------------------------------------
+        // Upload
+        // --------------------------------------------------
+        const url =
+            await uploadToCatbox(
+                buffer,
+                fileName,
+                media.mime
+            )
 
-    cleanSessions()
+        // --------------------------------------------------
+        // Success
+        // --------------------------------------------------
+        await m.react("✅")
 
-
-    const key =
-        getKey(m)
-
-
-    const session =
-        sessions.get(key)
-
-
-    if (!session) {
-        return false
-    }
-
-
-    if (
-        Date.now() - session.time >
-        SESSION_TIME
-    ) {
-
-        sessions.delete(key)
-
-        return false
-    }
-
-
-    if (
-        session.step !== 'waiting'
-    ) {
-
-        return false
-    }
-
-
-    const info =
-        getMediaInfo(m)
-
-
-    if (!info) {
-
-        return false
-    }
-
-
-    try {
-
-        await m.reply(
-            '⏳ جاري رفع الميديا إلى Catbox...'
+        return m.reply(
+            "✅ *DAMAR-MD CATBOX*\n\n" +
+            "تم رفع الملف بنجاح 🎉\n\n" +
+            "🔗 *الرابط:*\n" +
+            url +
+            "\n\n" +
+            "📁 *النوع:* ." +
+            extension
         )
-
-
-        const result =
-            await processMedia(m)
-
-
-        sessions.delete(key)
-
-
-        await m.reply(
-            resultText(result)
-        )
-
 
     } catch (error) {
-
         console.error(
-            '[RABIT BEFORE ERROR]',
-            error
+            "========== DAMAR-MD RABIT ERROR =========="
+        )
+        console.error(error)
+        console.error(
+            "==========================================="
         )
 
+        await m.react("❌")
 
-        sessions.delete(key)
-
-
-        await m.reply(`
-❌ فشل الرفع.
-
-📌 السبب:
-${error.message}
-`)
+        return m.reply(
+            "❌ *DAMAR-MD*\n\n" +
+            "فشل رفع الملف إلى Catbox.\n\n" +
+            "📌 السبب:\n" +
+            `${error?.message || "خطأ غير معروف"}\n\n` +
+            "🔄 عاود جرب من بعد."
+        )
     }
-
-
-    return true
 }
 
-
-// ═══════════════════════════════
-// إعدادات الأمر
-// ═══════════════════════════════
-
+// ----------------------------------------------------------
+// Command
+// ----------------------------------------------------------
 handler.help = [
-    'rabit'
+    "Rabit"
 ]
 
 handler.tags = [
-    'tools'
+    "uploader"
 ]
 
-handler.command =
-    /^rabit$/i
-
+handler.command = [
+    "rabit",
+    "رابط"
+]
 
 export default handler
