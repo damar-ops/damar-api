@@ -1,14 +1,65 @@
 {
-  "name": "gaff-prod",
+  "name": "Gaff",
   "version": "2.0.0",
-  "description": "private prod service",
+  "description": "Lightweight WhatsApp Multi-Device bot built with Baileys.",
+  "main": "index.js",
   "type": "module",
-  "scripts": {
-    "start": "node index.js"
+  "config": {
+    "omit": "dev"
   },
+  "directories": {
+    "lib": "lib",
+    "plugins": "plugins"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "format": "prettier --write .",
+    "lint": "eslint . --ext .js"
+  },
+  "author": "AgusXzz",
+  "homepage": "https://github.com/AgusXzz/ChiiMD#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AgusXzz/ChiiMD.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AgusXzz/ChiiMD/issues"
+  },
+  "keywords": [
+    "termux-whatsapp-bot",
+    "whatsapp-bot",
+    "whatsapp",
+    "js-whatsapp",
+    "whatsapp",
+    "Games-wabot",
+    "wabot-aq",
+    "multi-device",
+    "MD",
+    "baileys-md"
+  ],
+  "license": "ISC",
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.18",
-    "pino": "^9.4.0",
-    "chalk": "^4.1.2"
+    "awesome-phonenumber": "^2.68.0",
+    "axios": "^1.6.0",
+    "yt-search": "*",
+    "baileys": "latest",
+    "better-sqlite3": "^12.5.0",
+    "chalk": "^5.0.0",
+    "node-fetch": "*",
+    "cheerio": "^1.1.2",
+    "file-type": "^17.1.1",
+    "crypto":"*",
+    "fluent-ffmpeg": "^2.1.3",
+    "image-size": "^2.0.2",
+    "link-preview-js": "^3.2.0",
+    "moment-timezone": "^0.5.33",
+    "node-webpmux": "^3.2.1",
+    "syntax-error": "^1.4.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "globals": "^16.5.0",
+    "prettier": "^3.6.2"
   }
 }
