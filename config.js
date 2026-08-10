@@ -8,13 +8,13 @@ global.ButtonV2 = ButtonV2;
 global.Carousel = Carousel;
 global.AIRich = AIRich;
 
-global.pairingNumber = 212702816500;
+global.pairingNumber = 212603415919;
 global.owner = [
   ['212633226499', 'DAMAR-MD', true],
   ['', 'Owner 10', true],
 ];
 
-global.namebot = 'gaff ai';
+global.namebot = 'بوت';
 global.author = 'DAMAR-MD';
 global.source = 'https://www.facebook.com/profile.php?id=61591783185803';
 
