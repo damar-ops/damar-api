@@ -23,15 +23,18 @@ let handler = async (m, { conn, text }) => {
 
     if (!query) {
       return m.reply(
-        `╭───(    DAMAR-MD    )───\n` +
-        `├ 🇬🇧 You forgot to type something!\n` +
-        `├ Give me a song name OR a YouTube link.\n` +
-        `├ Example: .play funk universo\n` +
-        `├─────────────────────\n` +
-        `├ 🇲🇦 نسيتي تكتب شي!\n` +
-        `├ عطيني اسم الأغنية أو رابط يوتيوب.\n` +
-        `├ مثال: .play صوت الحرية\n` +
-        `╰──────────────────☉`
+        "*السلام عليكم لباس عليك* ✨\n\n" +
+        "انا *DAMAR-MD* البوت ديالك \n" +
+        "صنعني المطور *أبو دمار شامل* 👑\n\n" +
+        "باش نخدم معاك كتب شي امر بحال:\n" +
+        "*.menu*  → تشوف القائمة كاملة\n" +
+        "*.play*  → تحمل اغاني \n" +
+        "*.music* → سميات الاغاني\n" +
+        "*.apk*   → تحمل تطبيقات\n" +
+        "*.sticker* → تصاوب ملصقات\n" +
+        "*.ai* → دكاء اصطناعي\n\n" +
+        "ومزال كاينين اوامر بزاف... انا هنا باش نخدمك \n" +
+        "غير كتب الامر وانا ننفذو ليك فالبلاصة 🔥"
       );
     }
 
@@ -39,7 +42,7 @@ let handler = async (m, { conn, text }) => {
 
     if (query.length > 100) {
       return m.reply(
-        `╭───(    Silana Bot    )───\n` +
+        `╭───(    DAMAR-MD    )───\n` +
         `├ 🇬🇧 Query too long! Max 100 characters.\n` +
         `├ 🇲🇦 الطلب طويل بزاف! الحد الأقصى 100 حرف.\n` +
         `╰──────────────────☉`
@@ -52,7 +55,7 @@ let handler = async (m, { conn, text }) => {
     if (!data.status || !data.result?.download_url) {
       await conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } });
       return m.reply(
-        `╭───(    Silana Bot    )───\n` +
+        `╭───(    DAMAR-MD    )───\n` +
         `├ 🇬🇧 No results found for: "${query}"\n` +
         `├ Try a different song name or link.\n` +
         `├─────────────────────\n` +
@@ -81,7 +84,7 @@ let handler = async (m, { conn, text }) => {
       contextInfo: thumbnail ? {
         externalAdReply: {
           title: filename.substring(0, 30),
-          body: `Silana Bot • ${duration} • ${views} views`,
+          body: `DAMAR-MD • ${duration} • ${views} views`,
           thumbnailUrl: thumbnail,
           sourceUrl: sourceUrl,
           mediaType: 1,
@@ -96,7 +99,7 @@ let handler = async (m, { conn, text }) => {
       mimetype: 'audio/mpeg',
       fileName: `${filename.replace(/[<>:"/\\|?*]/g, '_')}.mp3`,
       caption:
-        `╭───(    Silana Bot    )───\n` +
+        `╭───(    DAMAR-MD    )───\n` +
         `├───≫ 🎵 PLAY ≪───\n` +
         `├\n` +
         `├ *${filename}*\n` +
@@ -111,7 +114,7 @@ let handler = async (m, { conn, text }) => {
     console.error('Play error:', error);
     await conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } });
     await m.reply(
-      `╭───(    Silana Bot    )───\n` +
+      `╭───(    DAMAR-MD    )───\n` +
       `├───≫ ⚠️ ERROR ≪───\n` +
       `├\n` +
       `├ 🇬🇧 Something went wrong. Try again later.\n` +
