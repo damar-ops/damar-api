@@ -1,157 +1,696 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 
+const BOT_NAME = "𝐃𝐀𝐌𝐀𝐑-𝐌𝐃";
+const DEVELOPER = "+212 633-226499";
+
+if (global.igAutoDownload === undefined) {
+  global.igAutoDownload = false;
+}
+
+/* =========================================================
+   Instagram API
+========================================================= */
+
 class InstaSave {
   constructor() {
-    this.types = ["media", "story", "dp"];
     this.client = axios.create({
       baseURL: "https://api.instasave.website",
-      method: "POST",
+
+      timeout: 30000,
+
       headers: {
-        "sec-ch-ua": '"Chromium";v="127", "Not)A;Brand";v="99", "Microsoft Edge Simulate";v="127", "Lemur";v="127"',
-        "Content-Type": "application/x-www-form-urlencoded",
-        Referer: "https://instasave.website/",
-        "Accept-Language": "id-ID",
-        "sec-ch-ua-mobile": "?1",
-        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Mobile Safari/537.36",
-        "sec-ch-ua-platform": '"Android"'
+        "Content-Type":
+          "application/x-www-form-urlencoded",
+
+        "User-Agent":
+          "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Mobile Safari/537.36",
+
+        Referer:
+          "https://instasave.website/download",
+
+        "Accept-Language":
+          "en-US,en;q=0.9"
       }
     });
   }
 
-  async req(url, data) {
+  async download(url) {
     try {
-      const res = await this.client({ url, data });
-      return { success: true, data: res.data };
-    } catch (err) {
-      return { success: false, message: err.message };
-    }
-  }
+      const response = await this.client.post(
+        "/media",
+        `url=${encodeURIComponent(url)}&lang=en`
+      );
 
-  parse(html) {
-    try {
-      const clean = (html || "")
-        .replace(/loader\['style'\]\['display'\]='none',document\['getElementById'\]\('div_download'\)\['innerHTML'\]='/g, "")
-        .replace(/',document\['getElementById'\]\('downloader'\)\['remove'\]\(\),showAd\(\);/g, "")
+      let html = String(response.data || "");
+
+      console.log(
+        `[${BOT_NAME}] API response length:`,
+        html.length
+      );
+
+      /*
+       * فك الترميز
+       */
+      html = html
+        .replace(/\\"/g, '"')
+        .replace(/\\\//g, "/")
         .replace(/\\x22/g, '"')
-        .replace(/\\x20/g, " ");
-      const $ = cheerio.load(clean);
-      const results = $(".download-box .download-items")
-        .map((_, el) => ({
-          thumb: $(el).find(".download-items__thumb img").attr("src") || "",
-          download: $(el).find(".download-items__btn a").attr("href") || ""
-        }))
-        .get();
-      return { success: true, results };
-    } catch (err) {
-      return { success: false, message: err.message, results: [] };
-    }
-  }
+        .replace(/\\x20/g, " ")
+        .replace(/&quot;/g, '"')
+        .replace(/&#x2F;/g, "/")
+        .replace(/\\u0026/g, "&");
 
-  async download({ url, type = "media" }) {
-    const target = url?.trim() || "";
-    const actType = type.trim().toLowerCase();
-    if (!this.types.includes(actType)) {
-      return { success: false, message: `Invalid type: ${actType}`, valid_types: this.types };
-    }
-    if (!target) return { success: false, message: "URL empty." };
+      const results = [];
 
-    const res = await this.req(`/${actType}`, `url=${encodeURIComponent(target)}&lang=en`);
-    return res.success ? this.parse(res.data) : res;
+      /*
+       * =====================================================
+       * الطريقة 1: HTML القديم ديال Instasave
+       * =====================================================
+       */
+
+      try {
+        const $ = cheerio.load(html);
+
+        $(".download-box .download-items").each(
+          (_, el) => {
+            const download =
+              $(el)
+                .find(".download-items__btn a")
+                .attr("href");
+
+            const thumb =
+              $(el)
+                .find(".download-items__thumb img")
+                .attr("src");
+
+            if (download) {
+              results.push({
+                download,
+                thumb: thumb || ""
+              });
+            }
+          }
+        );
+      } catch (e) {
+        console.log(
+          `[${BOT_NAME}] Cheerio parser error:`,
+          e.message
+        );
+      }
+
+      /*
+       * =====================================================
+       * الطريقة 2: استخراج روابط مباشرة من response
+       * =====================================================
+       */
+
+      if (!results.length) {
+        const matches =
+          html.match(
+            /https?:\/\/[^\s"'<>]+/gi
+          ) || [];
+
+        for (let link of matches) {
+          link = link
+            .replace(/\\+$/g, "")
+            .replace(/[\\'")\]}>]+$/g, "");
+
+          /*
+           * تجاهل روابط المواقع العادية
+           */
+          if (
+            link.includes("instasave.website") ||
+            link.includes("google.com") ||
+            link.includes("facebook.com")
+          ) {
+            continue;
+          }
+
+          /*
+           * نقبل روابط الفيديو والصور
+           */
+          if (
+            /\.(mp4|m4v|mov|jpg|jpeg|png|webp)(\?|&|$)/i.test(
+              link
+            )
+          ) {
+            if (
+              !results.some(
+                x => x.download === link
+              )
+            ) {
+              results.push({
+                download: link,
+                thumb: ""
+              });
+            }
+          }
+        }
+      }
+
+      /*
+       * =====================================================
+       * الطريقة 3: البحث على أي URL داخل JSON
+       * =====================================================
+       */
+
+      if (!results.length) {
+        const urlRegex =
+          /"(https?:\/\/[^"]+)"/g;
+
+        let match;
+
+        while (
+          (match = urlRegex.exec(html)) !== null
+        ) {
+          let link = match[1];
+
+          link = link
+            .replace(/\\\//g, "/")
+            .replace(/\\"/g, '"');
+
+          if (
+            /\.(mp4|m4v|mov|jpg|jpeg|png|webp)(\?|&|$)/i.test(
+              link
+            )
+          ) {
+            if (
+              !results.some(
+                x => x.download === link
+              )
+            ) {
+              results.push({
+                download: link,
+                thumb: ""
+              });
+            }
+          }
+        }
+      }
+
+      /*
+       * إزالة التكرار
+       */
+      const unique = [];
+
+      for (const item of results) {
+        if (!item.download) continue;
+
+        if (
+          !unique.some(
+            x => x.download === item.download
+          )
+        ) {
+          unique.push(item);
+        }
+      }
+
+      console.log(
+        `[${BOT_NAME}] Found media:`,
+        unique.length
+      );
+
+      return {
+        success: unique.length > 0,
+        results: unique
+      };
+
+    } catch (error) {
+      console.error(
+        `[${BOT_NAME}] API ERROR:`,
+        error.message
+      );
+
+      return {
+        success: false,
+        results: [],
+        message: error.message
+      };
+    }
   }
 }
 
 const igApi = new InstaSave();
 
-// Detect the download type from the command name used (igdl / igstory / igdp)
-const typeFromCommand = (cmd) => {
-  if (cmd === "igstory") return "story";
-  if (cmd === "igdp") return "dp";
-  return "media";
-};
+/* =========================================================
+   استخراج النص
+========================================================= */
 
-let handler = async (m, { conn, args, command, usedPrefix }) => {
-  const url = args[0];
+function getText(m) {
+  return (
+    m?.text ||
+    m?.body ||
+    m?.message?.conversation ||
+    m?.message?.extendedTextMessage?.text ||
+    m?.message?.imageMessage?.caption ||
+    m?.message?.videoMessage?.caption ||
+    m?.msg?.text ||
+    m?.msg?.caption ||
+    ""
+  );
+}
 
-  if (!url || !/instagram\.com/i.test(url)) {
+/* =========================================================
+   استخراج رابط Instagram
+========================================================= */
+
+function getInstagramUrl(text) {
+  const match = String(text || "").match(
+    /https?:\/\/(?:www\.)?instagram\.com\/[^\s]+/i
+  );
+
+  if (!match) return null;
+
+  return match[0]
+    .replace(/[)\]}>.,!?]+$/g, "");
+}
+
+/* =========================================================
+   تحميل وإرسال الفيديو
+========================================================= */
+
+async function processInstagram(
+  m,
+  conn,
+  instagramUrl
+) {
+  try {
+    await m.react("🕓");
+  } catch {}
+
+  console.log(
+    `[${BOT_NAME}] Downloading:`,
+    instagramUrl
+  );
+
+  try {
+    const result =
+      await igApi.download(
+        instagramUrl
+      );
+
+    if (
+      !result.success ||
+      !result.results?.length
+    ) {
+      try {
+        await m.react("✖️");
+      } catch {}
+
+      return conn.reply(
+        m.chat,
+
+        `╭━━━〔 ${BOT_NAME} 〕━━━╮
+┃ ❌ فشل تحميل Instagram
+╰━━━━━━━━━━━━━━━━━━╯
+
+الـAPI ما رجعش لينا رابط الفيديو 😅
+
+🔎 جرب:
+• Reel عمومي
+• رابط Instagram كامل
+• رابط آخر
+
+👨‍💻 المطور:
+${DEVELOPER}`,
+
+        m
+      );
+    }
+
+    let sent = false;
+
+    for (const media of result.results) {
+      if (!media.download) continue;
+
+      try {
+        console.log(
+          `[${BOT_NAME}] Fetching media...`
+        );
+
+        const file =
+          await axios.get(
+            media.download,
+            {
+              responseType:
+                "arraybuffer",
+
+              timeout: 60000,
+
+              maxContentLength:
+                150 * 1024 * 1024,
+
+              maxBodyLength:
+                150 * 1024 * 1024,
+
+              headers: {
+                "User-Agent":
+                  "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Mobile Safari/537.36",
+
+                Referer:
+                  "https://instasave.website/"
+              }
+            }
+          );
+
+        const buffer =
+          Buffer.from(file.data);
+
+        const contentType =
+          String(
+            file.headers["content-type"] || ""
+          ).toLowerCase();
+
+        const isVideo =
+          contentType.includes("video") ||
+          /\.mp4(\?|$)/i.test(
+            media.download
+          ) ||
+          /\.m4v(\?|$)/i.test(
+            media.download
+          ) ||
+          /\.mov(\?|$)/i.test(
+            media.download
+          );
+
+        /*
+         * الفيديو
+         */
+        if (isVideo) {
+          await conn.sendMessage(
+            m.chat,
+
+            {
+              video: buffer,
+
+              mimetype:
+                "video/mp4",
+
+              caption:
+                `╭━━━〔 ${BOT_NAME} 〕━━━╮
+┃ ✅ تم التحميل
+╰━━━━━━━━━━━━━━━━━━╯
+
+🎬 ها هو الفيديو ديالك ❤️
+
+👨‍💻 المطور:
+${DEVELOPER}`
+            },
+
+            {
+              quoted: m
+            }
+          );
+        }
+
+        /*
+         * الصورة
+         */
+        else {
+          await conn.sendMessage(
+            m.chat,
+
+            {
+              image: buffer,
+
+              caption:
+                `╭━━━〔 ${BOT_NAME} 〕━━━╮
+┃ ✅ تم التحميل
+╰━━━━━━━━━━━━━━━━━━╯
+
+🖼️ ها هي الصورة ديالك ❤️
+
+👨‍💻 المطور:
+${DEVELOPER}`
+            },
+
+            {
+              quoted: m
+            }
+          );
+        }
+
+        sent = true;
+
+        /*
+         * غير أول ملف
+         */
+        break;
+
+      } catch (error) {
+        console.error(
+          `[${BOT_NAME}] FILE ERROR:`,
+          error.message
+        );
+
+        continue;
+      }
+    }
+
+    if (!sent) {
+      try {
+        await m.react("✖️");
+      } catch {}
+
+      return conn.reply(
+        m.chat,
+
+        `╭━━━〔 ${BOT_NAME} 〕━━━╮
+┃ ❌ فشل إرسال الفيديو
+╰━━━━━━━━━━━━━━━━━━╯
+
+لقينا الرابط ولكن ملف الفيديو
+ما قدرناش نهبطوه دابا 😅
+
+🔄 جرب Reel آخر.
+
+👨‍💻 ${DEVELOPER}`,
+
+        m
+      );
+    }
+
+    try {
+      await m.react("✅");
+    } catch {}
+
+  } catch (error) {
+    console.error(
+      `[${BOT_NAME}] ERROR:`,
+      error.message
+    );
+
+    try {
+      await m.react("✖️");
+    } catch {}
+
     return conn.reply(
       m.chat,
-      `📌 *Instagram Downloader*\n\n` +
-      `Send an Instagram link to download it.\n\n` +
-      `*Usage:*\n` +
-      `${usedPrefix}ig <instagram post/reel url>\n` +
-      `${usedPrefix}igstory <instagram story url>\n` +
-      `${usedPrefix}instagram <instagram profile url>\n\n` +
-      `*Example:*\n` +
-      `${usedPrefix}ig https://www.instagram.com/reel/xxxxxxx/`,
+
+      `❌ وقع مشكل وأنا كنحاول نهبط الفيديو 😅
+
+🔄 عاود جرب رابط آخر.
+
+🤖 ${BOT_NAME}
+👨‍💻 ${DEVELOPER}`,
+
+      m
+    );
+  }
+}
+
+/* =========================================================
+   الأمر .ig
+========================================================= */
+
+const handler = async (
+  m,
+  {
+    conn,
+    args,
+    isOwner
+  }
+) => {
+  const action =
+    String(args?.[0] || "")
+      .toLowerCase();
+
+  /*
+   * .ig
+   */
+  if (!action) {
+    return conn.reply(
+      m.chat,
+
+      `╭━━━〔 ${BOT_NAME} 〕━━━╮
+┃ 📥 Instagram Downloader
+╰━━━━━━━━━━━━━━━━━━╯
+
+📊 الحالة:
+${
+  global.igAutoDownload
+    ? "🟢 خدام"
+    : "🔴 مطفي"
+}
+
+⚙️ الاستعمال:
+
+➤ *.ig on*
+🟢 تشغيل
+
+➤ *.ig off*
+🔴 إيقاف
+
+📥 منين يكون خدام:
+صيفط غير رابط Instagram
+والبوت يهبط الفيديو بوحدو.
+
+👨‍💻 المطور:
+${DEVELOPER}`,
+
       m
     );
   }
 
-  await m.react("🕓");
+  /*
+   * المالك فقط
+   */
+  if (!isOwner) {
+    return conn.reply(
+      m.chat,
 
-  try {
-    const type = typeFromCommand(command);
-    const result = await igApi.download({ url, type });
+      `❌ غير المالك يقدر يتحكم فـ Instagram Downloader.`,
 
-    if (!result.success || !result.results?.length) {
-      await m.react("✖️");
-      return conn.reply(m.chat, "❌ Failed to fetch media. The link may be invalid, private, or unsupported.", m);
-    }
-
-    let sentAny = false;
-    for (const item of result.results) {
-      if (!item.download) continue;
-
-      // Baileys fetching item.download directly often fails — these CDN
-      // links require the same browser-like headers as the scrape request
-      // (Referer, User-Agent), otherwise they return an error page instead
-      // of the actual file, which shows up as a broken/blank attachment.
-      let buffer, contentType;
-      try {
-        const fileRes = await axios.get(item.download, {
-          responseType: "arraybuffer",
-          timeout: 20000,
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Mobile Safari/537.36",
-            Referer: "https://instasave.website/"
-          }
-        });
-        buffer = Buffer.from(fileRes.data);
-        contentType = fileRes.headers["content-type"] || "";
-      } catch (fetchErr) {
-        console.error("[IG] Failed to fetch media file:", fetchErr.message);
-        continue;
-      }
-
-      const isVideo = contentType.includes("video") || /\.mp4(\?|$)/i.test(item.download);
-
-      await conn.sendMessage(
-        m.chat,
-        isVideo
-          ? { video: buffer, caption: "✅ Downloaded via Silana Bot" }
-          : { image: buffer, caption: "✅ Downloaded via Silana Bot" },
-        { quoted: m }
-      );
-      sentAny = true;
-    }
-
-    if (!sentAny) {
-      await m.react("✖️");
-      return conn.reply(m.chat, "❌ Media was found but couldn't be downloaded from the source. Try again later.", m);
-    }
-
-    await m.react("✅");
-  } catch (err) {
-    console.error("[IG Error]", err.message);
-    await m.react("✖️");
-    conn.reply(m.chat, `❌ An error occurred: ${err.message}`, m);
+      m
+    );
   }
+
+  /*
+   * ON
+   */
+  if (action === "on") {
+    global.igAutoDownload = true;
+
+    return conn.reply(
+      m.chat,
+
+      `╭━━━〔 ${BOT_NAME} 〕━━━╮
+┃ 🟢 Instagram Downloader
+╰━━━━━━━━━━━━━━━━━━╯
+
+✅ تم تشغيل التحميل التلقائي.
+
+📥 دابا صيفط غير رابط Instagram
+والبوت غادي يهبط الفيديو بوحدو.
+
+👨‍💻 ${DEVELOPER}`,
+
+      m
+    );
+  }
+
+  /*
+   * OFF
+   */
+  if (action === "off") {
+    global.igAutoDownload = false;
+
+    return conn.reply(
+      m.chat,
+
+      `╭━━━〔 ${BOT_NAME} 〕━━━╮
+┃ 🔴 Instagram Downloader
+╰━━━━━━━━━━━━━━━━━━╯
+
+⛔ تم إيقاف التحميل التلقائي.
+
+📥 روابط Instagram ما غاديش تتحمل.
+
+👨‍💻 ${DEVELOPER}`,
+
+      m
+    );
+  }
+
+  return conn.reply(
+    m.chat,
+
+    `❌ استعمل:
+
+.ig
+.ig on
+.ig off`,
+
+    m
+  );
 };
 
-handler.help = handler.command = ["instagram", "igstory", "ig"];
-handler.tags = ["downloader"];
+/* =========================================================
+   التقاط روابط Instagram من الرسائل العادية
+========================================================= */
+
+handler.before = async (
+  m,
+  { conn }
+) => {
+
+  /*
+   * مطفي
+   */
+  if (!global.igAutoDownload) {
+    return;
+  }
+
+  const text = getText(m);
+
+  if (!text) return;
+
+  /*
+   * تجاهل أوامر .ig
+   */
+  if (
+    /^\.ig(?:\s|$)/i.test(
+      text.trim()
+    )
+  ) {
+    return;
+  }
+
+  /*
+   * Instagram URL
+   */
+  const instagramUrl =
+    getInstagramUrl(text);
+
+  if (!instagramUrl) return;
+
+  /*
+   * تحميل
+   */
+  await processInstagram(
+    m,
+    conn,
+    instagramUrl
+  );
+};
+
+/* =========================================================
+   Settings
+========================================================= */
+
+handler.command = ["ig"];
+
+handler.help = [
+  "ig",
+  "ig on",
+  "ig off"
+];
+
+handler.tags = [
+  "downloader"
+];
+
 handler.limit = false;
 
 export default handler;
-  
