@@ -10,98 +10,45 @@ const BOT_NAME = "𝐃𝐀𝐌𝐀𝐑-𝐌𝐃"
 const DEVELOPER = "أبو دمار شامل"
 const DEVELOPER_NUMBER = "+212 633-226499"
 
-const DEVELOPER_FACEBOOK =
-    "https://www.facebook.com/profile.php?id=61591783185803"
-
-const SONG_IMAGE =
-    "https://litter.catbox.moe/72vuqp.jpg"
-
-const SEARCH_TTL =
-    10 * 60 * 1000
-
-const MAX_RESULTS =
-    10
-
-const MAX_AUDIO_SIZE =
-    100 * 1024 * 1024
+const DEVELOPER_FACEBOOK = "https://www.facebook.com/profile.php?id=61591783185803"
+const SONG_IMAGE = "https://litter.catbox.moe/72vuqp.jpg"
+const SEARCH_TTL = 10 * 60 * 1000
+const MAX_RESULTS = 10
+const MAX_AUDIO_SIZE = 100 * 1024 * 1024
 
 // ============================================================
 // SEARCH CACHE
 // ============================================================
 
-global.damarSongSearches =
-    global.damarSongSearches ||
-    new Map()
+global.damarSongSearches = global.damarSongSearches || new Map()
 
 // ============================================================
 // SAFE STRING
 // ============================================================
 
 function safeString(value, fallback = "") {
-
     try {
-
-        if (
-            value === undefined ||
-            value === null
-        ) {
-            return fallback
-        }
-
-        if (typeof value === "string") {
-            return value
-        }
-
-        if (
-            typeof value === "number" ||
-            typeof value === "boolean" ||
-            typeof value === "bigint"
-        ) {
-            return String(value)
-        }
-
+        if (value === undefined || value === null) return fallback
+        if (typeof value === "string") return value
+        if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") return String(value)
         if (typeof value === "object") {
-
-            if (
-                typeof value.title === "string"
-            ) {
-                return value.title
-            }
-
-            if (
-                typeof value.name === "string"
-            ) {
-                return value.name
-            }
-
-            if (
-                typeof value.text === "string"
-            ) {
-                return value.text
-            }
-
-            if (
-                typeof value.value === "string"
-            ) {
-                return value.value
-            }
-
-            try {
-
-                return JSON.stringify(value)
-
-            } catch {
-
-                return fallback
-            }
+            if (typeof value.title === "string") return value.title
+            if (typeof value.name === "string") return value.name
+            if (typeof value.text === "string") return value.text
+            if (typeof value.value === "string") return value.value
+            try { return JSON.stringify(value) } catch { return fallback }
         }
-
         return String(value)
+    } catch { return fallback }
+}
 
-    } catch {
+// ============================================================
+// CHECK STATUS
+// ============================================================
 
-        return fallback
-    }
+function isStatus(m) {
+    const jid = safeString(m?.key?.remoteJid || m?.chat || "")
+    return jid.includes("status@broadcast")
 }
 
 // ============================================================
@@ -109,14 +56,7 @@ function safeString(value, fallback = "") {
 // ============================================================
 
 function getUserId(m) {
-
-    return safeString(
-        m?.sender ||
-        m?.participant ||
-        m?.key?.participant ||
-        m?.chat ||
-        "unknown"
-    )
+    return safeString(m?.sender || m?.participant || m?.key?.participant || m?.chat || "unknown")
 }
 
 // ============================================================
@@ -124,81 +64,25 @@ function getUserId(m) {
 // ============================================================
 
 function extractVideoId(url) {
-
     try {
+        const value = safeString(url)
+        if (!value) return null
+        const parsed = new URL(value)
+        const host = safeString(parsed.hostname).toLowerCase()
 
-        const value =
-            safeString(url)
-
-        if (!value) {
-            return null
+        if (host === "youtu.be" || host.endsWith(".youtu.be")) {
+            return safeString(parsed.pathname.replace(/^\/+/, "").split("/")[0]) || null
         }
 
-        const parsed =
-            new URL(value)
-
-        const host =
-            safeString(
-                parsed.hostname
-            ).toLowerCase()
-
-        if (
-            host === "youtu.be" ||
-            host.endsWith(".youtu.be")
-        ) {
-
-            return safeString(
-                parsed.pathname
-                    .replace(/^\/+/, "")
-                    .split("/")[0]
-            ) || null
+        if (host.includes("youtube.com")) {
+            const v = parsed.searchParams.get("v")
+            if (v) return safeString(v)
+            const parts = parsed.pathname.split("/").filter(Boolean)
+            const index = parts.findIndex(part => ["shorts","embed","live"].includes(safeString(part).toLowerCase()))
+            if (index >= 0 && parts[index + 1]) return safeString(parts[index + 1])
         }
-
-        if (
-            host.includes("youtube.com")
-        ) {
-
-            const v =
-                parsed.searchParams.get("v")
-
-            if (v) {
-                return safeString(v)
-            }
-
-            const parts =
-                parsed.pathname
-                    .split("/")
-                    .filter(Boolean)
-
-            const index =
-                parts.findIndex(
-                    part =>
-                        [
-                            "shorts",
-                            "embed",
-                            "live"
-                        ].includes(
-                            safeString(part).toLowerCase()
-                        )
-                )
-
-            if (
-                index >= 0 &&
-                parts[index + 1]
-            ) {
-
-                return safeString(
-                    parts[index + 1]
-                )
-            }
-        }
-
         return null
-
-    } catch {
-
-        return null
-    }
+    } catch { return null }
 }
 
 // ============================================================
@@ -206,41 +90,13 @@ function extractVideoId(url) {
 // ============================================================
 
 function formatDuration(seconds) {
-
-    const number =
-        Number(seconds)
-
-    if (
-        !Number.isFinite(number) ||
-        number < 0
-    ) {
-        return "غير معروف"
-    }
-
-    const h =
-        Math.floor(number / 3600)
-
-    const m =
-        Math.floor(
-            (number % 3600) / 60
-        )
-
-    const s =
-        Math.floor(number % 60)
-
-    if (h > 0) {
-
-        return (
-            `${h}:` +
-            `${String(m).padStart(2, "0")}:` +
-            `${String(s).padStart(2, "0")}`
-        )
-    }
-
-    return (
-        `${m}:` +
-        `${String(s).padStart(2, "0")}`
-    )
+    const number = Number(seconds)
+    if (!Number.isFinite(number) || number < 0) return "غير معروف"
+    const h = Math.floor(number / 3600)
+    const m = Math.floor((number % 3600) / 60)
+    const s = Math.floor(number % 60)
+    if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+    return `${m}:${String(s).padStart(2, "0")}`
 }
 
 // ============================================================
@@ -248,81 +104,30 @@ function formatDuration(seconds) {
 // ============================================================
 
 function sanitizeFileName(name) {
-
-    return safeString(
-        name,
-        "DAMAR-MD SONG"
-    )
-        .replace(
-            /[<>:"/\\|?*\x00-\x1F]/g,
-            ""
-        )
-        .replace(
-            /\s+/g,
-            " "
-        )
-        .trim()
-        .substring(0, 100)
-        || "DAMAR-MD SONG"
+    return safeString(name, "DAMAR-MD SONG")
+       .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
+       .replace(/\s+/g, " ")
+       .trim()
+       .substring(0, 100) || "DAMAR-MD SONG"
 }
 
 // ============================================================
-// SAVE SEARCH
+// SAVE / GET SEARCH
 // ============================================================
 
 function saveSearch(user, results) {
-
-    global.damarSongSearches.set(
-        getUserId({
-            sender: user
-        }),
-        {
-            results:
-                Array.isArray(results)
-                    ? results
-                    : [],
-            created:
-                Date.now()
-        }
-    )
+    global.damarSongSearches.set(getUserId({sender: user}), { results: Array.isArray(results)? results : [], created: Date.now() })
 }
 
-// ============================================================
-// GET SEARCH
-// ============================================================
-
 function getSearch(user) {
-
-    const key =
-        getUserId({
-            sender: user
-        })
-
-    const data =
-        global.damarSongSearches.get(
-            key
-        )
-
-    if (!data) {
+    const key = getUserId({sender: user})
+    const data = global.damarSongSearches.get(key)
+    if (!data) return null
+    if (Date.now() - Number(data.created || 0) > SEARCH_TTL) {
+        global.damarSongSearches.delete(key)
         return null
     }
-
-    if (
-        Date.now() -
-        Number(data.created || 0) >
-        SEARCH_TTL
-    ) {
-
-        global.damarSongSearches.delete(
-            key
-        )
-
-        return null
-    }
-
-    return Array.isArray(data.results)
-        ? data.results
-        : null
+    return Array.isArray(data.results)? data.results : null
 }
 
 // ============================================================
@@ -330,89 +135,24 @@ function getSearch(user) {
 // ============================================================
 
 async function searchSongs(query) {
-
-    const cleanQuery =
-        safeString(
-            query
-        ).trim()
-
-    if (!cleanQuery) {
-        return []
-    }
-
-    const result =
-        await yts(
-            cleanQuery
-        )
-
-    const videos =
-        Array.isArray(result?.videos)
-            ? result.videos
-            : []
-
-    return videos
-        .filter(
-            video =>
-                video &&
-                safeString(video.url) &&
-                extractVideoId(
-                    video.url
-                )
-        )
-        .slice(
-            0,
-            MAX_RESULTS
-        )
-        .map(
-            video => {
-
-                const url =
-                    safeString(
-                        video.url
-                    )
-
-                return {
-
-                    title:
-                        safeString(
-                            video.title,
-                            "بدون عنوان"
-                        ),
-
-                    artist:
-                        safeString(
-                            video.author?.name,
-                            "Unknown"
-                        ),
-
-                    url,
-
-                    videoId:
-                        extractVideoId(
-                            url
-                        ),
-
-                    thumbnail:
-                        safeString(
-                            video.thumbnail
-                        ) ||
-                        SONG_IMAGE,
-
-                    duration:
-                        safeString(
-                            video.timestamp
-                        ) ||
-                        formatDuration(
-                            video.seconds
-                        ),
-
-                    views:
-                        Number(
-                            video.views
-                        ) || 0
-                }
+    const cleanQuery = safeString(query).trim()
+    if (!cleanQuery) return []
+    const result = await yts(cleanQuery)
+    const videos = Array.isArray(result?.videos)? result.videos : []
+    return videos.filter(video => video && safeString(video.url) && extractVideoId(video.url))
+       .slice(0, MAX_RESULTS)
+       .map(video => {
+            const url = safeString(video.url)
+            return {
+                title: safeString(video.title, "بدون عنوان"),
+                artist: safeString(video.author?.name, "Unknown"),
+                url,
+                videoId: extractVideoId(url),
+                thumbnail: safeString(video.thumbnail) || SONG_IMAGE,
+                duration: safeString(video.timestamp) || formatDuration(video.seconds),
+                views: Number(video.views) || 0
             }
-        )
+        })
 }
 
 // ============================================================
@@ -420,291 +160,61 @@ async function searchSongs(query) {
 // ============================================================
 
 function createSaveTubeClient() {
-
     return axios.create({
-
-        timeout:
-            30000,
-
-        maxContentLength:
-            MAX_AUDIO_SIZE,
-
-        maxBodyLength:
-            MAX_AUDIO_SIZE,
-
+        timeout: 30000,
+        maxContentLength: MAX_AUDIO_SIZE,
+        maxBodyLength: MAX_AUDIO_SIZE,
         headers: {
-
-            Accept:
-                "application/json, text/plain, */*",
-
-            "Content-Type":
-                "application/json",
-
-            Origin:
-                "https://yt.savetube.me",
-
-            Referer:
-                "https://yt.savetube.me/",
-
-            "User-Agent":
-                "Mozilla/5.0 (Linux; Android 15) " +
-                "AppleWebKit/537.36 " +
-                "Chrome/130.0.0.0 " +
-                "Mobile Safari/537.36"
+            Accept: "application/json, text/plain, */*",
+            "Content-Type": "application/json",
+            Origin: "https://yt.savetube.me",
+            Referer: "https://yt.savetube.me/",
+            "User-Agent": "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36"
         }
     })
 }
 
 // ============================================================
-// GET CDN
+// GET CDN / INFO / DECRYPT / AUDIO
 // ============================================================
 
 async function getCDN(client) {
-
-    const response =
-        await client.get(
-            "https://media.savetube.vip/api/random-cdn",
-            {
-                timeout:
-                    20000
-            }
-        )
-
-    const cdn =
-        safeString(
-            response?.data?.cdn
-        )
-
-    if (!cdn) {
-
-        throw new Error(
-            "SaveTube CDN غير متاح"
-        )
-    }
-
-    return cdn
-        .replace(
-            /^https?:\/\//,
-            ""
-        )
-        .replace(
-            /\/+$/,
-            ""
-        )
+    const response = await client.get("https://media.savetube.vip/api/random-cdn", { timeout: 20000 })
+    const cdn = safeString(response?.data?.cdn)
+    if (!cdn) throw new Error("SaveTube CDN غير متاح")
+    return cdn.replace(/^https?:\/\//, "").replace(/\/+$/, "")
 }
 
-// ============================================================
-// GET INFO
-// ============================================================
-
-async function getVideoInfo(
-    client,
-    cdn,
-    youtubeUrl
-) {
-
-    const response =
-        await client.post(
-
-            `https://${cdn}/v2/info`,
-
-            {
-                url:
-                    safeString(
-                        youtubeUrl
-                    )
-            },
-
-            {
-                timeout:
-                    30000
-            }
-        )
-
-    if (!response?.data) {
-
-        throw new Error(
-            "SaveTube لم يرجع معلومات"
-        )
-    }
-
+async function getVideoInfo(client, cdn, youtubeUrl) {
+    const response = await client.post(`https://${cdn}/v2/info`, { url: safeString(youtubeUrl) }, { timeout: 30000 })
+    if (!response?.data) throw new Error("SaveTube لم يرجع معلومات")
     return response.data
 }
 
-// ============================================================
-// DECRYPT SAVETUBE
-// ============================================================
-
 function decryptSaveTubeInfo(info) {
-
-    const encryptedData =
-        safeString(
-            info?.data
-        )
-
-    if (!encryptedData) {
-
-        throw new Error(
-            "SaveTube رجع بيانات فارغة"
-        )
-    }
-
+    const encryptedData = safeString(info?.data)
+    if (!encryptedData) throw new Error("SaveTube رجع بيانات فارغة")
     let encrypted
-
+    try { encrypted = Buffer.from(encryptedData, "base64") } catch { throw new Error("بيانات SaveTube غير صالحة") }
+    if (encrypted.length < 17) throw new Error("بيانات SaveTube ناقصة")
+    const key = Buffer.from("C5D58EF67A7584E4A29F6C35BBC4EB12", "hex")
+    const iv = encrypted.subarray(0, 16)
     try {
-
-        encrypted =
-            Buffer.from(
-                encryptedData,
-                "base64"
-            )
-
-    } catch {
-
-        throw new Error(
-            "بيانات SaveTube غير صالحة"
-        )
-    }
-
-    if (
-        encrypted.length < 17
-    ) {
-
-        throw new Error(
-            "بيانات SaveTube ناقصة"
-        )
-    }
-
-    const key =
-        Buffer.from(
-            "C5D58EF67A7584E4A29F6C35BBC4EB12",
-            "hex"
-        )
-
-    const iv =
-        encrypted.subarray(
-            0,
-            16
-        )
-
-    try {
-
-        const decipher =
-            createDecipheriv(
-                "aes-128-cbc",
-                key,
-                iv
-            )
-
-        const decrypted =
-            Buffer.concat([
-
-                decipher.update(
-                    encrypted.subarray(16)
-                ),
-
-                decipher.final()
-
-            ])
-
-        return JSON.parse(
-            decrypted.toString(
-                "utf8"
-            )
-        )
-
-    } catch (error) {
-
-        throw new Error(
-            "تعذر فك بيانات SaveTube"
-        )
-    }
+        const decipher = createDecipheriv("aes-128-cbc", key, iv)
+        const decrypted = Buffer.concat([decipher.update(encrypted.subarray(16)), decipher.final()])
+        return JSON.parse(decrypted.toString("utf8"))
+    } catch { throw new Error("تعذر فك بيانات SaveTube") }
 }
 
-// ============================================================
-// GET AUDIO URL
-// ============================================================
-
-async function getAudioDownload(
-    client,
-    cdn,
-    videoId,
-    meta
-) {
-
-    const id =
-        safeString(
-            videoId
-        )
-
-    const key =
-        safeString(
-            meta?.key
-        )
-
-    if (!id) {
-
-        throw new Error(
-            "YouTube ID غير موجود"
-        )
-    }
-
-    if (!key) {
-
-        throw new Error(
-            "SaveTube key غير موجود"
-        )
-    }
-
-    const response =
-        await client.post(
-
-            `https://${cdn}/download`,
-
-            {
-
-                id,
-
-                downloadType:
-                    "audio",
-
-                quality:
-                    "128",
-
-                key
-
-            },
-
-            {
-                timeout:
-                    40000
-            }
-        )
-
-    const data =
-        response?.data
-
-    const downloadUrl =
-        safeString(
-            data?.data?.downloadUrl
-        ) ||
-        safeString(
-            data?.downloadUrl
-        ) ||
-        safeString(
-            data?.data?.url
-        ) ||
-        safeString(
-            data?.url
-        )
-
-    if (!downloadUrl) {
-
-        throw new Error(
-            "رابط الصوت غير موجود"
-        )
-    }
-
+async function getAudioDownload(client, cdn, videoId, meta) {
+    const id = safeString(videoId)
+    const key = safeString(meta?.key)
+    if (!id) throw new Error("YouTube ID غير موجود")
+    if (!key) throw new Error("SaveTube key غير موجود")
+    const response = await client.post(`https://${cdn}/download`, { id, downloadType: "audio", quality: "128", key }, { timeout: 40000 })
+    const data = response?.data
+    const downloadUrl = safeString(data?.data?.downloadUrl) || safeString(data?.downloadUrl) || safeString(data?.data?.url) || safeString(data?.url)
+    if (!downloadUrl) throw new Error("رابط الصوت غير موجود")
     return downloadUrl
 }
 
@@ -712,62 +222,15 @@ async function getAudioDownload(
 // SEND SEARCH MENU
 // ============================================================
 
-async function sendSongSearchMenu(
-    m,
-    conn,
-    query,
-    results
-) {
+async function sendSongSearchMenu(m, conn, query, results) {
+    const safeResults = Array.isArray(results)? results : []
+    const rows = safeResults.map((song, index) => ({
+        title: String(`🎵 ${index + 1}. ${safeString(song?.title, `الأغنية ${index + 1}`)}`),
+        description: String(`👤 ${safeString(song?.artist, "Unknown")} • ⏱ ${safeString(song?.duration, "?")}`),
+        id: String(`.songpick ${index + 1}`)
+    }))
 
-    const safeResults =
-        Array.isArray(results)
-            ? results
-            : []
-
-    const rows =
-        safeResults.map(
-            (song, index) => {
-
-                const title =
-                    safeString(
-                        song?.title,
-                        `الأغنية ${index + 1}`
-                    )
-
-                const artist =
-                    safeString(
-                        song?.artist,
-                        "Unknown"
-                    )
-
-                const duration =
-                    safeString(
-                        song?.duration,
-                        "?"
-                    )
-
-                return {
-
-                    title:
-                        String(
-                            `🎵 ${index + 1}. ${title}`
-                        ),
-
-                    description:
-                        String(
-                            `👤 ${artist} • ⏱ ${duration}`
-                        ),
-
-                    id:
-                        String(
-                            `.songpick ${index + 1}`
-                        )
-                }
-            }
-        )
-
-    const caption =
-`╭━━━⪩ ${BOT_NAME} ⪨━━━╮
+    const caption = `╭━━━⪩ ${BOT_NAME} ⪨━━━╮
 ┃ 🎵 *اختيار الأغنية*
 ┃
 ┃ 🔎 *البحث:* ${safeString(query)}
@@ -778,190 +241,30 @@ async function sendSongSearchMenu(
 ┃
 ┃ 👑 *المطور:* ${DEVELOPER}
 ┃ 📞 *${DEVELOPER_NUMBER}*
-╰━━━━━━━━━━━━━━━━━━╯`
-
-    // ========================================================
-    // BUTTON
-    // ========================================================
+╰━━━━━━━━━━╯`
 
     try {
-
-        if (
-            typeof conn.sendButton !==
-            "function"
-        ) {
-
-            throw new Error(
-                "sendButton غير موجود"
-            )
-        }
-
-        await conn.sendButton(
-
-            m.chat,
-
-            {
-
-                image: {
-                    url:
-                        String(
-                            SONG_IMAGE
-                        )
-                },
-
-                caption:
-                    String(
-                        caption
-                    ),
-
-                footer:
-                    String(
-                        `${BOT_NAME} • Music`
-                    ),
-
-                buttons: [
-
-                    {
-
-                        name:
-                            "single_select",
-
-                        buttonParamsJson:
-                            JSON.stringify({
-
-                                title:
-                                    "🎵 اختيار الأغنية",
-
-                                sections: [
-
-                                    {
-
-                                        title:
-                                            "🎧 نتائج البحث",
-
-                                        rows:
-                                            rows.map(
-                                                row => ({
-
-                                                    title:
-                                                        String(
-                                                            row.title
-                                                        ),
-
-                                                    description:
-                                                        String(
-                                                            row.description
-                                                        ),
-
-                                                    id:
-                                                        String(
-                                                            row.id
-                                                        )
-                                                })
-                                            )
-                                    }
-                                ]
-                            })
-                    },
-
-                    {
-
-                        name:
-                            "cta_url",
-
-                        buttonParamsJson:
-                            JSON.stringify({
-
-                                display_text:
-                                    "👤 المطور",
-
-                                url:
-                                    String(
-                                        DEVELOPER_FACEBOOK
-                                    )
-                            })
-                    }
-                ]
-            },
-
-            {
-                quoted:
-                    m
-            }
-        )
-
+        if (typeof conn.sendButton!== "function") throw new Error("sendButton غير موجود")
+        await conn.sendButton(m.chat, {
+            image: { url: String(SONG_IMAGE) },
+            caption: String(caption),
+            footer: String(`${BOT_NAME} • Music`),
+            buttons: [
+                { name: "single_select", buttonParamsJson: JSON.stringify({ title: "🎵 اختيار الأغنية", sections: [{ title: "🎧 نتائج البحث", rows }] }) },
+                { name: "cta_url", buttonParamsJson: JSON.stringify({ display_text: "👤 المطور", url: String(DEVELOPER_FACEBOOK) }) }
+            ]
+        }, { quoted: m })
         return true
-
     } catch (error) {
-
-        console.log(
-            `[${BOT_NAME}] BUTTON ERROR:`,
-            error?.message
-        )
+        console.log(`[${BOT_NAME}] BUTTON ERROR:`, error?.message)
     }
 
-    // ========================================================
-    // FALLBACK
-    // ========================================================
-
-    let text =
-`${caption}
-
-🎧 *لائحة الأغاني:*
-
-`
-
-    safeResults.forEach(
-        (song, index) => {
-
-            text +=
-`*${index + 1}.* ${safeString(
-    song?.title,
-    "بدون عنوان"
-)}
-👤 ${safeString(
-    song?.artist,
-    "Unknown"
-)}
-⏱ ${safeString(
-    song?.duration,
-    "غير معروف"
-)}
-
-`
-        }
-    )
-
-    text +=
-`📌 للاختيار:
-
-.songpick 1`
-
-    await conn.sendMessage(
-
-        m.chat,
-
-        {
-
-            image: {
-                url:
-                    String(
-                        SONG_IMAGE
-                    )
-            },
-
-            caption:
-                String(
-                    text
-                )
-        },
-
-        {
-            quoted:
-                m
-        }
-    )
-
+    let text = `${caption}\n\n🎧 *لائحة الأغاني:*\n\n`
+    safeResults.forEach((song, index) => {
+        text += `*${index + 1}.* ${safeString(song?.title, "بدون عنوان")}\n👤 ${safeString(song?.artist, "Unknown")}\n⏱ ${safeString(song?.duration, "غير معروف")}\n\n`
+    })
+    text += `📌 للاختيار:\n.songpick 1`
+    await conn.sendMessage(m.chat, { image: { url: String(SONG_IMAGE) }, caption: String(text) }, { quoted: m })
     return false
 }
 
@@ -969,97 +272,23 @@ async function sendSongSearchMenu(
 // DOWNLOAD + SEND
 // ============================================================
 
-async function downloadAndSendSong(
-    m,
-    conn,
-    song
-) {
+async function downloadAndSendSong(m, conn, song) {
+    const title = safeString(song?.title, "DAMAR-MD SONG")
+    const artist = safeString(song?.artist, "Unknown")
+    const duration = safeString(song?.duration, "غير معروف")
+    const thumbnail = safeString(song?.thumbnail) || SONG_IMAGE
+    const url = safeString(song?.url)
+    const videoId = safeString(song?.videoId) || extractVideoId(url)
+    if (!videoId) throw new Error("YouTube Video ID غير صالح")
+    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`
 
-    const title =
-        safeString(
-            song?.title,
-            "DAMAR-MD SONG"
-        )
+    const client = createSaveTubeClient()
+    const cdn = await getCDN(client)
+    const info = await getVideoInfo(client, cdn, youtubeUrl)
+    const meta = decryptSaveTubeInfo(info)
+    const downloadUrl = await getAudioDownload(client, cdn, videoId, meta)
 
-    const artist =
-        safeString(
-            song?.artist,
-            "Unknown"
-        )
-
-    const duration =
-        safeString(
-            song?.duration,
-            "غير معروف"
-        )
-
-    const thumbnail =
-        safeString(
-            song?.thumbnail
-        ) ||
-        SONG_IMAGE
-
-    const url =
-        safeString(
-            song?.url
-        )
-
-    const videoId =
-        safeString(
-            song?.videoId
-        ) ||
-        extractVideoId(
-            url
-        )
-
-    if (!videoId) {
-
-        throw new Error(
-            "YouTube Video ID غير صالح"
-        )
-    }
-
-    const youtubeUrl =
-        `https://www.youtube.com/watch?v=${videoId}`
-
-    // ========================================================
-    // SAVETUBE
-    // ========================================================
-
-    const client =
-        createSaveTubeClient()
-
-    const cdn =
-        await getCDN(
-            client
-        )
-
-    const info =
-        await getVideoInfo(
-            client,
-            cdn,
-            youtubeUrl
-        )
-
-    const meta =
-        decryptSaveTubeInfo(
-            info
-        )
-
-    const downloadUrl =
-        await getAudioDownload(
-            client,
-            cdn,
-            videoId,
-            meta
-        )
-
-    // ========================================================
-    // SONG INFO
-    // ========================================================
-
-    const caption =
-`╭━━━⪩ ${BOT_NAME} ⪨━━━╮
+    const caption = `╭━━━⪩ ${BOT_NAME} ⪨━━━╮
 ┃ 🎵 *تم تحميل الأغنية*
 ┃
 ┃ 📌 *العنوان:* ${title}
@@ -1070,385 +299,92 @@ async function downloadAndSendSong(
 ┃ 📞 *${DEVELOPER_NUMBER}*
 ╰━━━━━━━━━━━━━━━━━━╯`
 
-    // ========================================================
-    // IMAGE
-    // ========================================================
-
     try {
-
-        await conn.sendMessage(
-
-            m.chat,
-
-            {
-
-                image: {
-                    url:
-                        String(
-                            thumbnail
-                        )
-                },
-
-                caption:
-                    String(
-                        caption
-                    )
-            },
-
-            {
-                quoted:
-                    m
-            }
-        )
-
+        await conn.sendMessage(m.chat, { image: { url: String(thumbnail) }, caption: String(caption) }, { quoted: m })
     } catch (error) {
-
-        console.log(
-            `[${BOT_NAME}] IMAGE ERROR:`,
-            error?.message
-        )
-
-        try {
-
-            await m.reply(
-                String(caption)
-            )
-
-        } catch {}
+        console.log(`[${BOT_NAME}] IMAGE ERROR:`, error?.message)
+        try { await m.reply(String(caption)) } catch {}
     }
 
-    // ========================================================
-    // AUDIO
-    // ========================================================
-
-    await conn.sendMessage(
-
-        m.chat,
-
-        {
-
-            audio: {
-                url:
-                    String(
-                        downloadUrl
-                    )
-            },
-
-            mimetype:
-                "audio/mpeg",
-
-            fileName:
-                `${sanitizeFileName(
-                    title
-                )}.mp3`,
-
-            ptt:
-                false
-        },
-
-        {
-            quoted:
-                m
-        }
-    )
+    await conn.sendMessage(m.chat, { audio: { url: String(downloadUrl) }, mimetype: "audio/mpeg", fileName: `${sanitizeFileName(title)}.mp3`, ptt: false }, { quoted: m })
 }
 
 // ============================================================
 // HANDLER
 // ============================================================
 
-const handler = async (
-    m,
-    {
-        text,
-        conn,
-        args,
-        command
-    }
-) => {
-
+const handler = async (m, { text, conn, args, command }) => {
     try {
+        // منع العمل في الحالة
+        if (isStatus(m)) {
+            return m.reply(`❌ *Group Status ما مدعومش فنسخة Baileys الحالية.*\n\n📌 خاص تحديث مكتبة Baileys.`)
+        }
 
-        const cmd =
-            safeString(
-                command
-            ).toLowerCase()
+        const cmd = safeString(command).toLowerCase()
 
-        // ====================================================
-        // SONGPICK
-        // ====================================================
-
-        if (
-            cmd === "songpick" ||
-            cmd === "اختيار"
-        ) {
-
-            const number =
-                parseInt(
-                    safeString(
-                        args?.[0] ||
-                        text ||
-                        "0"
-                    ),
-                    10
-                )
-
-            if (
-                !Number.isInteger(
-                    number
-                ) ||
-                number < 1
-            ) {
-
-                return m.reply(
-`❌ *${BOT_NAME}*
-
-كتب رقم الأغنية.
-
-مثال:
-.songpick 1`
-                )
+        if (cmd === "songpick" || cmd === "اختيار") {
+            const number = parseInt(safeString(args?.[0] || text || "0"), 10)
+            if (!Number.isInteger(number) || number < 1) {
+                return m.reply(`❌ *${BOT_NAME}*\n\nكتب رقم الأغنية.\n\nمثال:\n.songpick 1`)
             }
-
-            const results =
-                getSearch(
-                    m
-                )
-
-            if (
-                !Array.isArray(
-                    results
-                ) ||
-                !results.length
-            ) {
-
-                return m.reply(
-`⚠️ *${BOT_NAME}*
-
-اللائحة سالات أو منتهية.
-
-عاود دير:
-
-.song اسم الأغنية`
-                )
+            const results = getSearch(m)
+            if (!Array.isArray(results) ||!results.length) {
+                return m.reply(`⚠️ *${BOT_NAME}*\n\nاللائحة سالات أو منتهية.\n\nعاود دير:\n.song اسم الأغنية`)
             }
+            const song = results[number - 1]
+            if (!song) return m.reply(`❌ *${BOT_NAME}*\n\nهاد الرقم ماكاينش.\n\nاختار من 1 حتى ${results.length}.`)
 
-            const song =
-                results[
-                    number - 1
-                ]
-
-            if (!song) {
-
-                return m.reply(
-`❌ *${BOT_NAME}*
-
-هاد الرقم ماكاينش.
-
-اختار من 1 حتى ${results.length}.`
-                )
-            }
-
+            try { await m.react("⏳") } catch {}
             try {
-
-                await m.react(
-                    "⏳"
-                )
-
-            } catch {}
-
-            // =================================================
-            // IMPORTANT:
-            // لا توجد رسالة "جاري تجهيز الأغنية"
-            // يبدأ التحميل مباشرة
-            // =================================================
-
-            try {
-
-                await downloadAndSendSong(
-                    m,
-                    conn,
-                    song
-                )
-
-                try {
-                    await m.react(
-                        "✅"
-                    )
-                } catch {}
-
+                await downloadAndSendSong(m, conn, song)
+                try { await m.react("✅") } catch {}
             } catch (error) {
-
-                console.error(
-                    `[${BOT_NAME}] DOWNLOAD ERROR:`,
-                    error
-                )
-
-                try {
-                    await m.react(
-                        "❌"
-                    )
-                } catch {}
-
-                return m.reply(
-`❌ *${BOT_NAME}*
-
-ماقدرش نحمل هاد الأغنية.
-
-🎵 ${safeString(
-    song?.title,
-    "بدون عنوان"
-)}
-
-📌 *السبب:*
-${safeString(
-    error?.message,
-    "خطأ غير معروف"
-)}
-
-🔄 جرب أغنية أخرى من اللائحة.`
-                )
+                console.error(`[${BOT_NAME}] DOWNLOAD ERROR:`, error)
+                try { await m.react("❌") } catch {}
+                return m.reply(`❌ *${BOT_NAME}*\n\nماقدرش نحمل هاد الأغنية.\n\n🎵 ${safeString(song?.title, "بدون عنوان")}\n\n📌 *السبب:*\n${safeString(error?.message, "خطأ غير معروف")}\n\n🔄 جرب أغنية أخرى من اللائحة.`)
             }
-
             return
         }
 
-        // ====================================================
-        // SONG COMMAND
-        // ====================================================
-
-        const query =
-            safeString(
-                text
-            ).trim()
-
+        const query = safeString(text).trim()
         if (!query) {
-
-            return m.reply(
-`╭━━━⪩ ${BOT_NAME} ⪨━━━╮
+            return m.reply(`╭━━━⪩ ${BOT_NAME} ⪨━━━╮
 ┃ 🎵 *تحميل الأغاني*
 ┃
 ┃ كتب اسم الأغنية.
 ┃
 ┃ 📌 مثال:
-┃ .song TFLOW
+┃.song TFLOW
 ┃
 ┃ أو:
-┃ .song Maher Zain
+┃.song Maher Zain
 ┃
 ┃ 👇 غادي نعطيك لائحة
 ┃ وتختار الأغنية بالزر.
 ┃
 ┃ 👑 *المطور:* ${DEVELOPER}
 ┃ 📞 *${DEVELOPER_NUMBER}*
-╰━━━━━━━━━━━━━━━━━━╯`
-            )
+╰━━━━━━━━━━━━━━━━━━╯`)
         }
 
-        try {
-
-            await m.react(
-                "🔎"
-            )
-
-        } catch {}
-
-        // ====================================================
-        // SEARCH
-        // ====================================================
-
-        const results =
-            await searchSongs(
-                query
-            )
-
-        if (
-            !Array.isArray(
-                results
-            ) ||
-            !results.length
-        ) {
-
-            try {
-                await m.react(
-                    "❌"
-                )
-            } catch {}
-
-            return m.reply(
-`❌ *${BOT_NAME}*
-
-مالقيتش نتائج لـ:
-
-🔎 ${query}
-
-جرب اسم أغنية آخر.`
-            )
+        try { await m.react("🔎") } catch {}
+        const results = await searchSongs(query)
+        if (!Array.isArray(results) ||!results.length) {
+            try { await m.react("❌") } catch {}
+            return m.reply(`❌ *${BOT_NAME}*\n\nمالقيتش نتائج لـ:\n\n🔎 ${query}\n\nجرب اسم أغنية آخر.`)
         }
 
-        // ====================================================
-        // SAVE
-        // ====================================================
-
-        saveSearch(
-            m,
-            results
-        )
-
-        // ====================================================
-        // SEND LIST
-        // ====================================================
-
-        await sendSongSearchMenu(
-            m,
-            conn,
-            query,
-            results
-        )
-
-        try {
-            await m.react(
-                "✅"
-            )
-        } catch {}
+        saveSearch(m, results)
+        await sendSongSearchMenu(m, conn, query, results)
+        try { await m.react("✅") } catch {}
 
     } catch (error) {
-
-        console.error(
-            "================================"
-        )
-
-        console.error(
-            `${BOT_NAME} ERROR`
-        )
-
-        console.error(
-            error
-        )
-
-        console.error(
-            "================================"
-        )
-
-        try {
-            await m.react(
-                "❌"
-            )
-        } catch {}
-
-        return m.reply(
-`❌ *${BOT_NAME}*
-
-وقع مشكل فالعملية.
-
-📌 *السبب:*
-${safeString(
-    error?.message,
-    "خطأ غير معروف"
-)}
-
-🔄 عاود جرب مرة أخرى.`
-        )
+        console.error("================================")
+        console.error(`${BOT_NAME} ERROR`)
+        console.error(error)
+        console.error("================================")
+        try { await m.react("❌") } catch {}
+        return m.reply(`❌ *${BOT_NAME}*\n\nوقع مشكل فالعملية.\n\n📌 *السبب:*\n${safeString(error?.message, "خطأ غير معروف")}\n\n🔄 عاود جرب مرة أخرى.`)
     }
 }
 
@@ -1456,24 +392,9 @@ ${safeString(
 // COMMANDS
 // ============================================================
 
-handler.help = [
-    "song <اسم الأغنية>",
-    "songpick <رقم>"
-]
-
-handler.tags = [
-    "downloader"
-]
-
-handler.command = [
-    "song",
-    "شغل",
-    "اغنية",
-    "أغنية",
-    "songpick",
-    "اختيار"
-]
-
+handler.help = ["song <اسم الأغنية>", "songpick <رقم>"]
+handler.tags = ["downloader"]
+handler.command = ["song", "شغل", "اغنية", "أغنية", "songpick", "اختيار"]
 handler.limit = false
 
 export default handler
