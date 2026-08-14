@@ -2,427 +2,1463 @@ import axios from "axios"
 import { createDecipheriv } from "node:crypto"
 import yts from "yt-search"
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+// ============================================================
+// 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃 MUSIC DOWNLOADER
+// ============================================================
 
-const handler = async (m, { text, conn }) => {
+const BOT_NAME = "𝐃𝐀𝐌𝐀𝐑-𝐌𝐃"
+const DEVELOPER = "أبو دمار شامل"
+const DEVELOPER_NUMBER = "+212 633-226499"
+
+const DEVELOPER_FACEBOOK =
+    "https://www.facebook.com/profile.php?id=61591783185803"
+
+const SONG_IMAGE =
+    "https://litter.catbox.moe/72vuqp.jpg"
+
+const SEARCH_TTL =
+    10 * 60 * 1000
+
+const MAX_RESULTS =
+    10
+
+const MAX_AUDIO_SIZE =
+    100 * 1024 * 1024
+
+// ============================================================
+// SEARCH CACHE
+// ============================================================
+
+global.damarSongSearches =
+    global.damarSongSearches ||
+    new Map()
+
+// ============================================================
+// SAFE STRING
+// ============================================================
+
+function safeString(value, fallback = "") {
+
     try {
-        if (!text) {
-            return m.reply(
-                "⚠️ *DAMAR-MD*\n\n" +
-                "شنو سميت الأغنية اللي باغي؟\n" +
-                "مثال: .song maher zain"
-            )
+
+        if (
+            value === undefined ||
+            value === null
+        ) {
+            return fallback
         }
 
-        await m.react("⏳")
-
-        const search = await yts(text)
-        const metadata = search?.videos?.[0]
-
-        if (!metadata) {
-            await m.react("❌")
-            return m.reply(
-                "❌ *DAMAR-MD*\n\n" +
-                "مالقيتش هاد الأغنية، جرب اسم آخر."
-            )
+        if (typeof value === "string") {
+            return value
         }
 
-        const videoUrl = metadata.url
-        const videoId = extractVideoId(videoUrl)
-
-        if (!videoId) {
-            throw new Error("YouTube Video ID غير صالح")
+        if (
+            typeof value === "number" ||
+            typeof value === "boolean" ||
+            typeof value === "bigint"
+        ) {
+            return String(value)
         }
 
-        const youtubeUrl =
-            `https://www.youtube.com/watch?v=${videoId}`
+        if (typeof value === "object") {
 
-        const client = axios.create({
-            timeout: 30000,
-            headers: {
-                "Accept": "application/json, text/plain, */*",
-                "Content-Type": "application/json",
-                "Origin": "https://yt.savetube.me",
-                "Referer": "https://yt.savetube.me/",
-                "User-Agent":
-                    "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 " +
-                    "(KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
+            if (
+                typeof value.title === "string"
+            ) {
+                return value.title
             }
-        })
 
-        // =========================
-        // GET CDN
-        // =========================
+            if (
+                typeof value.name === "string"
+            ) {
+                return value.name
+            }
 
-        let cdn = null
+            if (
+                typeof value.text === "string"
+            ) {
+                return value.text
+            }
 
-        for (let i = 1; i <= 3; i++) {
+            if (
+                typeof value.value === "string"
+            ) {
+                return value.value
+            }
+
             try {
-                const { data } = await client.get(
-                    "https://media.savetube.vip/api/random-cdn"
-                )
 
-                if (data?.cdn) {
-                    cdn = String(data.cdn)
-                        .replace(/^https?:\/\//, "")
-                        .replace(/\/+$/, "")
+                return JSON.stringify(value)
 
-                    break
-                }
-
-                throw new Error("CDN غير موجود")
-            } catch (err) {
-                console.log(
-                    `SaveTube CDN ${i}:`,
-                    err?.message
-                )
-
-                if (i < 3) {
-                    await sleep(i * 1500)
-                }
-            }
-        }
-
-        if (!cdn) {
-            throw new Error(
-                "SaveTube CDN غير متاح حالياً"
-            )
-        }
-
-        // =========================
-        // VIDEO INFO
-        // =========================
-
-        let infoRes = null
-
-        for (let i = 1; i <= 3; i++) {
-            try {
-                const response = await client.post(
-                    `https://${cdn}/v2/info`,
-                    {
-                        url: youtubeUrl
-                    }
-                )
-
-                if (!response?.data) {
-                    throw new Error(
-                        "SaveTube لم يرجع معلومات"
-                    )
-                }
-
-                infoRes = response.data
-                break
-            } catch (err) {
-                console.log(
-                    `SaveTube INFO ${i}:`,
-                    err?.message
-                )
-
-                if (i < 3) {
-                    await sleep(i * 2000)
-                }
-            }
-        }
-
-        if (!infoRes) {
-            throw new Error(
-                "فشل الحصول على معلومات الفيديو"
-            )
-        }
-
-        // =========================
-        // DECRYPT INFO
-        // =========================
-
-        let meta
-
-        try {
-            let encryptedData = infoRes?.data
-
-            /*
-             * SaveTube غالباً كيرجع data مشفرة
-             * على شكل Base64.
-             */
-
-            if (typeof encryptedData !== "string") {
-                throw new Error(
-                    "SaveTube رجع بيانات غير صالحة"
-                )
-            }
-
-            const encrypted = Buffer.from(
-                encryptedData,
-                "base64"
-            )
-
-            if (encrypted.length < 17) {
-                throw new Error(
-                    "البيانات المشفرة ناقصة"
-                )
-            }
-
-            const key = Buffer.from(
-                "C5D58EF67A7584E4A29F6C35BBC4EB12",
-                "hex"
-            )
-
-            const iv = encrypted.subarray(0, 16)
-
-            // IMPORTANT:
-            // استعملنا createDecipheriv مباشرة
-            // بدل crypto.createDecipheriv
-
-            const decipher = createDecipheriv(
-                "aes-128-cbc",
-                key,
-                iv
-            )
-
-            const decrypted = Buffer.concat([
-                decipher.update(
-                    encrypted.subarray(16)
-                ),
-                decipher.final()
-            ])
-
-            meta = JSON.parse(
-                decrypted.toString("utf8")
-            )
-
-        } catch (err) {
-            console.error(
-                "SaveTube decrypt error:",
-                err
-            )
-
-            throw new Error(
-                "فشل فك معلومات SaveTube: " +
-                (err?.message || "Unknown error")
-            )
-        }
-
-        if (!meta) {
-            throw new Error(
-                "SaveTube Meta غير موجود"
-            )
-        }
-
-        // =========================
-        // DOWNLOAD
-        // =========================
-
-        let downloadUrl = null
-
-        for (let i = 1; i <= 3; i++) {
-            try {
-                const { data } = await client.post(
-                    `https://${cdn}/download`,
-                    {
-                        id: videoId,
-                        downloadType: "audio",
-                        quality: "128",
-                        key: meta.key
-                    }
-                )
-
-                downloadUrl =
-                    data?.data?.downloadUrl ||
-                    data?.downloadUrl ||
-                    data?.data?.url ||
-                    data?.url
-
-                if (downloadUrl) {
-                    break
-                }
-
-                throw new Error(
-                    "رابط التحميل غير موجود"
-                )
-
-            } catch (err) {
-                console.log(
-                    `SaveTube DOWNLOAD ${i}:`,
-                    err?.message
-                )
-
-                if (i < 3) {
-                    await sleep(i * 2000)
-                }
-            }
-        }
-
-        if (!downloadUrl) {
-            throw new Error(
-                "SaveTube لم يرجع رابط التحميل"
-            )
-        }
-
-        // =========================
-        // SONG INFO
-        // =========================
-
-        const title =
-            metadata.title ||
-            "DAMAR-MD Song"
-
-        const artist =
-            metadata.author?.name ||
-            "Unknown"
-
-        const duration =
-            metadata.timestamp ||
-            "غير معروف"
-
-        const thumbnail =
-            meta.thumbnail ||
-            metadata.thumbnail
-
-        const caption =
-`🎵 *DAMAR-MD SONG DOWNLOADER*
-━━━━━━━━━━━━━━━━
-📌 *العنوان:* ${title}
-👤 *الفنان:* ${artist}
-⏱ *المدة:* ${duration}
-🔗 *الرابط:* ${youtubeUrl}
-━━━━━━━━━━━━━━━━
-👑 *المطور:* ابو دمار شامل
-📞 *+212 633-226499*
-━━━━━━━━━━━━━━━━
-⚡ *DAMAR-MD*`
-
-        // =========================
-        // THUMBNAIL
-        // =========================
-
-        if (thumbnail) {
-            try {
-                await conn.sendMessage(
-                    m.chat,
-                    {
-                        image: {
-                            url: thumbnail
-                        },
-                        caption
-                    },
-                    {
-                        quoted: m
-                    }
-                )
             } catch {
-                await m.reply(caption)
+
+                return fallback
             }
-        } else {
-            await m.reply(caption)
         }
 
-        // =========================
-        // AUDIO
-        // =========================
+        return String(value)
 
-        await conn.sendMessage(
-            m.chat,
-            {
-                audio: {
-                    url: downloadUrl
-                },
-                mimetype: "audio/mpeg",
-                fileName:
-                    `${sanitizeFileName(title)}.mp3`
-            },
-            {
-                quoted: m
-            }
-        )
+    } catch {
 
-        await m.react("✅")
-
-    } catch (e) {
-        console.error(
-            "========== DAMAR-MD SONG ERROR =========="
-        )
-        console.error(e)
-        console.error(
-            "=========================================="
-        )
-
-        await m.react("❌")
-
-        return m.reply(
-            "❌ *DAMAR-MD*\n\n" +
-            "وقع خطأ فالتحميل.\n\n" +
-            "📌 السبب:\n" +
-            `${e?.message || "خطأ غير معروف"}\n\n` +
-            "🔄 عاود جرب من بعد."
-        )
+        return fallback
     }
 }
 
-// =========================
-// YouTube ID
-// =========================
+// ============================================================
+// SAFE ID
+// ============================================================
+
+function getUserId(m) {
+
+    return safeString(
+        m?.sender ||
+        m?.participant ||
+        m?.key?.participant ||
+        m?.chat ||
+        "unknown"
+    )
+}
+
+// ============================================================
+// YOUTUBE ID
+// ============================================================
 
 function extractVideoId(url) {
+
     try {
-        const parsed = new URL(url)
+
+        const value =
+            safeString(url)
+
+        if (!value) {
+            return null
+        }
+
+        const parsed =
+            new URL(value)
+
+        const host =
+            safeString(
+                parsed.hostname
+            ).toLowerCase()
 
         if (
-            parsed.hostname === "youtu.be" ||
-            parsed.hostname.endsWith("youtu.be")
+            host === "youtu.be" ||
+            host.endsWith(".youtu.be")
         ) {
-            return parsed.pathname
-                .replace("/", "")
-                .split("/")[0]
+
+            return safeString(
+                parsed.pathname
+                    .replace(/^\/+/, "")
+                    .split("/")[0]
+            ) || null
         }
 
         if (
-            parsed.hostname.includes("youtube.com")
+            host.includes("youtube.com")
         ) {
+
             const v =
                 parsed.searchParams.get("v")
 
-            if (v) return v
+            if (v) {
+                return safeString(v)
+            }
 
             const parts =
-                parsed.pathname.split("/")
+                parsed.pathname
+                    .split("/")
+                    .filter(Boolean)
 
             const index =
-                parts.findIndex(x =>
-                    ["shorts", "embed", "live"]
-                        .includes(x)
+                parts.findIndex(
+                    part =>
+                        [
+                            "shorts",
+                            "embed",
+                            "live"
+                        ].includes(
+                            safeString(part).toLowerCase()
+                        )
                 )
 
             if (
-                index !== -1 &&
+                index >= 0 &&
                 parts[index + 1]
             ) {
-                return parts[index + 1]
+
+                return safeString(
+                    parts[index + 1]
+                )
             }
         }
 
         return null
 
     } catch {
+
         return null
     }
 }
 
-// =========================
-// Filename
-// =========================
+// ============================================================
+// DURATION
+// ============================================================
+
+function formatDuration(seconds) {
+
+    const number =
+        Number(seconds)
+
+    if (
+        !Number.isFinite(number) ||
+        number < 0
+    ) {
+        return "غير معروف"
+    }
+
+    const h =
+        Math.floor(number / 3600)
+
+    const m =
+        Math.floor(
+            (number % 3600) / 60
+        )
+
+    const s =
+        Math.floor(number % 60)
+
+    if (h > 0) {
+
+        return (
+            `${h}:` +
+            `${String(m).padStart(2, "0")}:` +
+            `${String(s).padStart(2, "0")}`
+        )
+    }
+
+    return (
+        `${m}:` +
+        `${String(s).padStart(2, "0")}`
+    )
+}
+
+// ============================================================
+// FILE NAME
+// ============================================================
 
 function sanitizeFileName(name) {
-    return String(name)
+
+    return safeString(
+        name,
+        "DAMAR-MD SONG"
+    )
         .replace(
             /[<>:"/\\|?*\x00-\x1F]/g,
             ""
         )
-        .replace(/\s+/g, " ")
+        .replace(
+            /\s+/g,
+            " "
+        )
         .trim()
         .substring(0, 100)
+        || "DAMAR-MD SONG"
 }
 
+// ============================================================
+// SAVE SEARCH
+// ============================================================
+
+function saveSearch(user, results) {
+
+    global.damarSongSearches.set(
+        getUserId({
+            sender: user
+        }),
+        {
+            results:
+                Array.isArray(results)
+                    ? results
+                    : [],
+            created:
+                Date.now()
+        }
+    )
+}
+
+// ============================================================
+// GET SEARCH
+// ============================================================
+
+function getSearch(user) {
+
+    const key =
+        getUserId({
+            sender: user
+        })
+
+    const data =
+        global.damarSongSearches.get(
+            key
+        )
+
+    if (!data) {
+        return null
+    }
+
+    if (
+        Date.now() -
+        Number(data.created || 0) >
+        SEARCH_TTL
+    ) {
+
+        global.damarSongSearches.delete(
+            key
+        )
+
+        return null
+    }
+
+    return Array.isArray(data.results)
+        ? data.results
+        : null
+}
+
+// ============================================================
+// SEARCH YOUTUBE
+// ============================================================
+
+async function searchSongs(query) {
+
+    const cleanQuery =
+        safeString(
+            query
+        ).trim()
+
+    if (!cleanQuery) {
+        return []
+    }
+
+    const result =
+        await yts(
+            cleanQuery
+        )
+
+    const videos =
+        Array.isArray(result?.videos)
+            ? result.videos
+            : []
+
+    return videos
+        .filter(
+            video =>
+                video &&
+                safeString(video.url) &&
+                extractVideoId(
+                    video.url
+                )
+        )
+        .slice(
+            0,
+            MAX_RESULTS
+        )
+        .map(
+            video => {
+
+                const url =
+                    safeString(
+                        video.url
+                    )
+
+                return {
+
+                    title:
+                        safeString(
+                            video.title,
+                            "بدون عنوان"
+                        ),
+
+                    artist:
+                        safeString(
+                            video.author?.name,
+                            "Unknown"
+                        ),
+
+                    url,
+
+                    videoId:
+                        extractVideoId(
+                            url
+                        ),
+
+                    thumbnail:
+                        safeString(
+                            video.thumbnail
+                        ) ||
+                        SONG_IMAGE,
+
+                    duration:
+                        safeString(
+                            video.timestamp
+                        ) ||
+                        formatDuration(
+                            video.seconds
+                        ),
+
+                    views:
+                        Number(
+                            video.views
+                        ) || 0
+                }
+            }
+        )
+}
+
+// ============================================================
+// SAVETUBE CLIENT
+// ============================================================
+
+function createSaveTubeClient() {
+
+    return axios.create({
+
+        timeout:
+            30000,
+
+        maxContentLength:
+            MAX_AUDIO_SIZE,
+
+        maxBodyLength:
+            MAX_AUDIO_SIZE,
+
+        headers: {
+
+            Accept:
+                "application/json, text/plain, */*",
+
+            "Content-Type":
+                "application/json",
+
+            Origin:
+                "https://yt.savetube.me",
+
+            Referer:
+                "https://yt.savetube.me/",
+
+            "User-Agent":
+                "Mozilla/5.0 (Linux; Android 15) " +
+                "AppleWebKit/537.36 " +
+                "Chrome/130.0.0.0 " +
+                "Mobile Safari/537.36"
+        }
+    })
+}
+
+// ============================================================
+// GET CDN
+// ============================================================
+
+async function getCDN(client) {
+
+    const response =
+        await client.get(
+            "https://media.savetube.vip/api/random-cdn",
+            {
+                timeout:
+                    20000
+            }
+        )
+
+    const cdn =
+        safeString(
+            response?.data?.cdn
+        )
+
+    if (!cdn) {
+
+        throw new Error(
+            "SaveTube CDN غير متاح"
+        )
+    }
+
+    return cdn
+        .replace(
+            /^https?:\/\//,
+            ""
+        )
+        .replace(
+            /\/+$/,
+            ""
+        )
+}
+
+// ============================================================
+// GET INFO
+// ============================================================
+
+async function getVideoInfo(
+    client,
+    cdn,
+    youtubeUrl
+) {
+
+    const response =
+        await client.post(
+
+            `https://${cdn}/v2/info`,
+
+            {
+                url:
+                    safeString(
+                        youtubeUrl
+                    )
+            },
+
+            {
+                timeout:
+                    30000
+            }
+        )
+
+    if (!response?.data) {
+
+        throw new Error(
+            "SaveTube لم يرجع معلومات"
+        )
+    }
+
+    return response.data
+}
+
+// ============================================================
+// DECRYPT SAVETUBE
+// ============================================================
+
+function decryptSaveTubeInfo(info) {
+
+    const encryptedData =
+        safeString(
+            info?.data
+        )
+
+    if (!encryptedData) {
+
+        throw new Error(
+            "SaveTube رجع بيانات فارغة"
+        )
+    }
+
+    let encrypted
+
+    try {
+
+        encrypted =
+            Buffer.from(
+                encryptedData,
+                "base64"
+            )
+
+    } catch {
+
+        throw new Error(
+            "بيانات SaveTube غير صالحة"
+        )
+    }
+
+    if (
+        encrypted.length < 17
+    ) {
+
+        throw new Error(
+            "بيانات SaveTube ناقصة"
+        )
+    }
+
+    const key =
+        Buffer.from(
+            "C5D58EF67A7584E4A29F6C35BBC4EB12",
+            "hex"
+        )
+
+    const iv =
+        encrypted.subarray(
+            0,
+            16
+        )
+
+    try {
+
+        const decipher =
+            createDecipheriv(
+                "aes-128-cbc",
+                key,
+                iv
+            )
+
+        const decrypted =
+            Buffer.concat([
+
+                decipher.update(
+                    encrypted.subarray(16)
+                ),
+
+                decipher.final()
+
+            ])
+
+        return JSON.parse(
+            decrypted.toString(
+                "utf8"
+            )
+        )
+
+    } catch (error) {
+
+        throw new Error(
+            "تعذر فك بيانات SaveTube"
+        )
+    }
+}
+
+// ============================================================
+// GET AUDIO URL
+// ============================================================
+
+async function getAudioDownload(
+    client,
+    cdn,
+    videoId,
+    meta
+) {
+
+    const id =
+        safeString(
+            videoId
+        )
+
+    const key =
+        safeString(
+            meta?.key
+        )
+
+    if (!id) {
+
+        throw new Error(
+            "YouTube ID غير موجود"
+        )
+    }
+
+    if (!key) {
+
+        throw new Error(
+            "SaveTube key غير موجود"
+        )
+    }
+
+    const response =
+        await client.post(
+
+            `https://${cdn}/download`,
+
+            {
+
+                id,
+
+                downloadType:
+                    "audio",
+
+                quality:
+                    "128",
+
+                key
+
+            },
+
+            {
+                timeout:
+                    40000
+            }
+        )
+
+    const data =
+        response?.data
+
+    const downloadUrl =
+        safeString(
+            data?.data?.downloadUrl
+        ) ||
+        safeString(
+            data?.downloadUrl
+        ) ||
+        safeString(
+            data?.data?.url
+        ) ||
+        safeString(
+            data?.url
+        )
+
+    if (!downloadUrl) {
+
+        throw new Error(
+            "رابط الصوت غير موجود"
+        )
+    }
+
+    return downloadUrl
+}
+
+// ============================================================
+// SEND SEARCH MENU
+// ============================================================
+
+async function sendSongSearchMenu(
+    m,
+    conn,
+    query,
+    results
+) {
+
+    const safeResults =
+        Array.isArray(results)
+            ? results
+            : []
+
+    const rows =
+        safeResults.map(
+            (song, index) => {
+
+                const title =
+                    safeString(
+                        song?.title,
+                        `الأغنية ${index + 1}`
+                    )
+
+                const artist =
+                    safeString(
+                        song?.artist,
+                        "Unknown"
+                    )
+
+                const duration =
+                    safeString(
+                        song?.duration,
+                        "?"
+                    )
+
+                return {
+
+                    title:
+                        String(
+                            `🎵 ${index + 1}. ${title}`
+                        ),
+
+                    description:
+                        String(
+                            `👤 ${artist} • ⏱ ${duration}`
+                        ),
+
+                    id:
+                        String(
+                            `.songpick ${index + 1}`
+                        )
+                }
+            }
+        )
+
+    const caption =
+`╭━━━⪩ ${BOT_NAME} ⪨━━━╮
+┃ 🎵 *اختيار الأغنية*
+┃
+┃ 🔎 *البحث:* ${safeString(query)}
+┃ 📀 *النتائج:* ${safeResults.length}
+┃
+┃ 👇 ضغط على الزر واختار
+┃ الأغنية اللي بغيتي.
+┃
+┃ 👑 *المطور:* ${DEVELOPER}
+┃ 📞 *${DEVELOPER_NUMBER}*
+╰━━━━━━━━━━━━━━━━━━╯`
+
+    // ========================================================
+    // BUTTON
+    // ========================================================
+
+    try {
+
+        if (
+            typeof conn.sendButton !==
+            "function"
+        ) {
+
+            throw new Error(
+                "sendButton غير موجود"
+            )
+        }
+
+        await conn.sendButton(
+
+            m.chat,
+
+            {
+
+                image: {
+                    url:
+                        String(
+                            SONG_IMAGE
+                        )
+                },
+
+                caption:
+                    String(
+                        caption
+                    ),
+
+                footer:
+                    String(
+                        `${BOT_NAME} • Music`
+                    ),
+
+                buttons: [
+
+                    {
+
+                        name:
+                            "single_select",
+
+                        buttonParamsJson:
+                            JSON.stringify({
+
+                                title:
+                                    "🎵 اختيار الأغنية",
+
+                                sections: [
+
+                                    {
+
+                                        title:
+                                            "🎧 نتائج البحث",
+
+                                        rows:
+                                            rows.map(
+                                                row => ({
+
+                                                    title:
+                                                        String(
+                                                            row.title
+                                                        ),
+
+                                                    description:
+                                                        String(
+                                                            row.description
+                                                        ),
+
+                                                    id:
+                                                        String(
+                                                            row.id
+                                                        )
+                                                })
+                                            )
+                                    }
+                                ]
+                            })
+                    },
+
+                    {
+
+                        name:
+                            "cta_url",
+
+                        buttonParamsJson:
+                            JSON.stringify({
+
+                                display_text:
+                                    "👤 المطور",
+
+                                url:
+                                    String(
+                                        DEVELOPER_FACEBOOK
+                                    )
+                            })
+                    }
+                ]
+            },
+
+            {
+                quoted:
+                    m
+            }
+        )
+
+        return true
+
+    } catch (error) {
+
+        console.log(
+            `[${BOT_NAME}] BUTTON ERROR:`,
+            error?.message
+        )
+    }
+
+    // ========================================================
+    // FALLBACK
+    // ========================================================
+
+    let text =
+`${caption}
+
+🎧 *لائحة الأغاني:*
+
+`
+
+    safeResults.forEach(
+        (song, index) => {
+
+            text +=
+`*${index + 1}.* ${safeString(
+    song?.title,
+    "بدون عنوان"
+)}
+👤 ${safeString(
+    song?.artist,
+    "Unknown"
+)}
+⏱ ${safeString(
+    song?.duration,
+    "غير معروف"
+)}
+
+`
+        }
+    )
+
+    text +=
+`📌 للاختيار:
+
+.songpick 1`
+
+    await conn.sendMessage(
+
+        m.chat,
+
+        {
+
+            image: {
+                url:
+                    String(
+                        SONG_IMAGE
+                    )
+            },
+
+            caption:
+                String(
+                    text
+                )
+        },
+
+        {
+            quoted:
+                m
+        }
+    )
+
+    return false
+}
+
+// ============================================================
+// DOWNLOAD + SEND
+// ============================================================
+
+async function downloadAndSendSong(
+    m,
+    conn,
+    song
+) {
+
+    const title =
+        safeString(
+            song?.title,
+            "DAMAR-MD SONG"
+        )
+
+    const artist =
+        safeString(
+            song?.artist,
+            "Unknown"
+        )
+
+    const duration =
+        safeString(
+            song?.duration,
+            "غير معروف"
+        )
+
+    const thumbnail =
+        safeString(
+            song?.thumbnail
+        ) ||
+        SONG_IMAGE
+
+    const url =
+        safeString(
+            song?.url
+        )
+
+    const videoId =
+        safeString(
+            song?.videoId
+        ) ||
+        extractVideoId(
+            url
+        )
+
+    if (!videoId) {
+
+        throw new Error(
+            "YouTube Video ID غير صالح"
+        )
+    }
+
+    const youtubeUrl =
+        `https://www.youtube.com/watch?v=${videoId}`
+
+    // ========================================================
+    // SAVETUBE
+    // ========================================================
+
+    const client =
+        createSaveTubeClient()
+
+    const cdn =
+        await getCDN(
+            client
+        )
+
+    const info =
+        await getVideoInfo(
+            client,
+            cdn,
+            youtubeUrl
+        )
+
+    const meta =
+        decryptSaveTubeInfo(
+            info
+        )
+
+    const downloadUrl =
+        await getAudioDownload(
+            client,
+            cdn,
+            videoId,
+            meta
+        )
+
+    // ========================================================
+    // SONG INFO
+    // ========================================================
+
+    const caption =
+`╭━━━⪩ ${BOT_NAME} ⪨━━━╮
+┃ 🎵 *تم تحميل الأغنية*
+┃
+┃ 📌 *العنوان:* ${title}
+┃ 👤 *الفنان:* ${artist}
+┃ ⏱ *المدة:* ${duration}
+┃
+┃ 👑 *المطور:* ${DEVELOPER}
+┃ 📞 *${DEVELOPER_NUMBER}*
+╰━━━━━━━━━━━━━━━━━━╯`
+
+    // ========================================================
+    // IMAGE
+    // ========================================================
+
+    try {
+
+        await conn.sendMessage(
+
+            m.chat,
+
+            {
+
+                image: {
+                    url:
+                        String(
+                            thumbnail
+                        )
+                },
+
+                caption:
+                    String(
+                        caption
+                    )
+            },
+
+            {
+                quoted:
+                    m
+            }
+        )
+
+    } catch (error) {
+
+        console.log(
+            `[${BOT_NAME}] IMAGE ERROR:`,
+            error?.message
+        )
+
+        try {
+
+            await m.reply(
+                String(caption)
+            )
+
+        } catch {}
+    }
+
+    // ========================================================
+    // AUDIO
+    // ========================================================
+
+    await conn.sendMessage(
+
+        m.chat,
+
+        {
+
+            audio: {
+                url:
+                    String(
+                        downloadUrl
+                    )
+            },
+
+            mimetype:
+                "audio/mpeg",
+
+            fileName:
+                `${sanitizeFileName(
+                    title
+                )}.mp3`,
+
+            ptt:
+                false
+        },
+
+        {
+            quoted:
+                m
+        }
+    )
+}
+
+// ============================================================
+// HANDLER
+// ============================================================
+
+const handler = async (
+    m,
+    {
+        text,
+        conn,
+        args,
+        command
+    }
+) => {
+
+    try {
+
+        const cmd =
+            safeString(
+                command
+            ).toLowerCase()
+
+        // ====================================================
+        // SONGPICK
+        // ====================================================
+
+        if (
+            cmd === "songpick" ||
+            cmd === "اختيار"
+        ) {
+
+            const number =
+                parseInt(
+                    safeString(
+                        args?.[0] ||
+                        text ||
+                        "0"
+                    ),
+                    10
+                )
+
+            if (
+                !Number.isInteger(
+                    number
+                ) ||
+                number < 1
+            ) {
+
+                return m.reply(
+`❌ *${BOT_NAME}*
+
+كتب رقم الأغنية.
+
+مثال:
+.songpick 1`
+                )
+            }
+
+            const results =
+                getSearch(
+                    m
+                )
+
+            if (
+                !Array.isArray(
+                    results
+                ) ||
+                !results.length
+            ) {
+
+                return m.reply(
+`⚠️ *${BOT_NAME}*
+
+اللائحة سالات أو منتهية.
+
+عاود دير:
+
+.song اسم الأغنية`
+                )
+            }
+
+            const song =
+                results[
+                    number - 1
+                ]
+
+            if (!song) {
+
+                return m.reply(
+`❌ *${BOT_NAME}*
+
+هاد الرقم ماكاينش.
+
+اختار من 1 حتى ${results.length}.`
+                )
+            }
+
+            try {
+
+                await m.react(
+                    "⏳"
+                )
+
+            } catch {}
+
+            // =================================================
+            // IMPORTANT:
+            // لا توجد رسالة "جاري تجهيز الأغنية"
+            // يبدأ التحميل مباشرة
+            // =================================================
+
+            try {
+
+                await downloadAndSendSong(
+                    m,
+                    conn,
+                    song
+                )
+
+                try {
+                    await m.react(
+                        "✅"
+                    )
+                } catch {}
+
+            } catch (error) {
+
+                console.error(
+                    `[${BOT_NAME}] DOWNLOAD ERROR:`,
+                    error
+                )
+
+                try {
+                    await m.react(
+                        "❌"
+                    )
+                } catch {}
+
+                return m.reply(
+`❌ *${BOT_NAME}*
+
+ماقدرش نحمل هاد الأغنية.
+
+🎵 ${safeString(
+    song?.title,
+    "بدون عنوان"
+)}
+
+📌 *السبب:*
+${safeString(
+    error?.message,
+    "خطأ غير معروف"
+)}
+
+🔄 جرب أغنية أخرى من اللائحة.`
+                )
+            }
+
+            return
+        }
+
+        // ====================================================
+        // SONG COMMAND
+        // ====================================================
+
+        const query =
+            safeString(
+                text
+            ).trim()
+
+        if (!query) {
+
+            return m.reply(
+`╭━━━⪩ ${BOT_NAME} ⪨━━━╮
+┃ 🎵 *تحميل الأغاني*
+┃
+┃ كتب اسم الأغنية.
+┃
+┃ 📌 مثال:
+┃ .song TFLOW
+┃
+┃ أو:
+┃ .song Maher Zain
+┃
+┃ 👇 غادي نعطيك لائحة
+┃ وتختار الأغنية بالزر.
+┃
+┃ 👑 *المطور:* ${DEVELOPER}
+┃ 📞 *${DEVELOPER_NUMBER}*
+╰━━━━━━━━━━━━━━━━━━╯`
+            )
+        }
+
+        try {
+
+            await m.react(
+                "🔎"
+            )
+
+        } catch {}
+
+        // ====================================================
+        // SEARCH
+        // ====================================================
+
+        const results =
+            await searchSongs(
+                query
+            )
+
+        if (
+            !Array.isArray(
+                results
+            ) ||
+            !results.length
+        ) {
+
+            try {
+                await m.react(
+                    "❌"
+                )
+            } catch {}
+
+            return m.reply(
+`❌ *${BOT_NAME}*
+
+مالقيتش نتائج لـ:
+
+🔎 ${query}
+
+جرب اسم أغنية آخر.`
+            )
+        }
+
+        // ====================================================
+        // SAVE
+        // ====================================================
+
+        saveSearch(
+            m,
+            results
+        )
+
+        // ====================================================
+        // SEND LIST
+        // ====================================================
+
+        await sendSongSearchMenu(
+            m,
+            conn,
+            query,
+            results
+        )
+
+        try {
+            await m.react(
+                "✅"
+            )
+        } catch {}
+
+    } catch (error) {
+
+        console.error(
+            "================================"
+        )
+
+        console.error(
+            `${BOT_NAME} ERROR`
+        )
+
+        console.error(
+            error
+        )
+
+        console.error(
+            "================================"
+        )
+
+        try {
+            await m.react(
+                "❌"
+            )
+        } catch {}
+
+        return m.reply(
+`❌ *${BOT_NAME}*
+
+وقع مشكل فالعملية.
+
+📌 *السبب:*
+${safeString(
+    error?.message,
+    "خطأ غير معروف"
+)}
+
+🔄 عاود جرب مرة أخرى.`
+        )
+    }
+}
+
+// ============================================================
+// COMMANDS
+// ============================================================
+
 handler.help = [
-    "song <اسم الأغنية>"
+    "song <اسم الأغنية>",
+    "songpick <رقم>"
 ]
 
 handler.tags = [
@@ -432,7 +1468,12 @@ handler.tags = [
 handler.command = [
     "song",
     "شغل",
-    "اغنية"
+    "اغنية",
+    "أغنية",
+    "songpick",
+    "اختيار"
 ]
+
+handler.limit = false
 
 export default handler
