@@ -1,217 +1,324 @@
 /*
  * 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃
- * WhatsApp Group Link Protection
+ * Anti WhatsApp Group Link
  *
- * أي واحد يرسل chat.whatsapp.com
- * 1 = تحذير
- * 2 = تحذير
- * 3 = طرد
+ * 🚫 منع روابط مجموعات واتساب
+ * 🗑️ حذف الرابط
+ * ⚠️ 3 تنبيهات
+ * 🚪 التنبيه الثالث = طرد
+ *
+ * خدام تلقائياً بلا أمر
  */
 
-const warnings = new Map();
+const warnings = global.antiGroupLinkWarnings || new Map();
 
-const handler = async (m, { participants, isAdmin, isBotAdmin }) => {
-	try {
-		// غير داخل المجموعات
-		if (!m.isGroup) return;
+global.antiGroupLinkWarnings = warnings;
 
-		// البوت خاصو يكون Admin
-		if (!isBotAdmin) return;
 
-		// الأدمنية ما يتعاقبوش
-		if (isAdmin) return;
+// ======================================================
+// MAIN HANDLER
+// ======================================================
 
-		// ------------------------------------------------
-		// الحصول على النص
-		// ------------------------------------------------
+const handler = async (m, { conn, participants, isAdmin, isBotAdmin, isOwner }) => {
+    try {
 
-		let text = '';
+        // خاص الرسالة تكون من مجموعة
+        if (!m.isGroup) return;
 
-		if (typeof m.text === 'string') {
-			text = m.text;
-		} else if (m.message) {
-			text =
-				m.message.conversation ||
-				m.message.extendedTextMessage?.text ||
-				m.message.imageMessage?.caption ||
-				m.message.videoMessage?.caption ||
-				m.message.documentMessage?.caption ||
-				'';
-		}
+        // المالك والأدمنية مستثنين
+        if (isOwner || isAdmin) return;
 
-		if (!text) return;
+        // البوت خاصو يكون Admin
+        if (!isBotAdmin) return;
 
-		// ------------------------------------------------
-		// اكتشاف رابط مجموعة واتساب
-		// ------------------------------------------------
+        // ------------------------------------------------
+        // جلب النص
+        // ------------------------------------------------
 
-		const linkRegex =
-			/(?:https?:\/\/)?(?:www\.)?chat\.whatsapp\.com\/[A-Za-z0-9_-]+/i;
+        let text = '';
 
-		if (!linkRegex.test(text)) return;
+        if (typeof m.text === 'string') {
+            text = m.text;
+        }
 
-		const sender = m.sender;
+        // بعض نسخ Baileys
+        if (!text && m.message) {
 
-		if (!sender) return;
+            text =
+                m.message.conversation ||
+                m.message.extendedTextMessage?.text ||
+                m.message.imageMessage?.caption ||
+                m.message.videoMessage?.caption ||
+                m.message.documentMessage?.caption ||
+                '';
+        }
 
-		// ------------------------------------------------
-		// تأكيد أن المرسل ليس Admin
-		// ------------------------------------------------
+        if (!text) return;
 
-		const member = participants?.find((p) => {
-			const jid =
-				p.jid ||
-				p.id ||
-				p.phoneNumber ||
-				'';
+        // ------------------------------------------------
+        // Anti WhatsApp Group Link
+        // ------------------------------------------------
 
-			return jid === sender;
-		});
+        const groupLinkRegex =
+            /(?:https?:\/\/)?(?:www\.)?chat\.whatsapp\.com\/[A-Za-z0-9_-]+/gi;
 
-		if (
-			member?.admin === 'admin' ||
-			member?.admin === 'superadmin'
-		) {
-			return;
-		}
+        const links = text.match(groupLinkRegex);
 
-		// ------------------------------------------------
-		// حساب التحذيرات
-		// ------------------------------------------------
+        if (!links || links.length === 0) return;
 
-		const key = `${m.chat}:${sender}`;
+        const sender = m.sender;
 
-		let count = warnings.get(key) || 0;
+        if (!sender) return;
 
-		count++;
+        // ------------------------------------------------
+        // التأكد أن العضو ماشي Admin
+        // ------------------------------------------------
 
-		warnings.set(key, count);
+        let member = null;
 
-		const tag = `@${sender.split('@')[0]}`;
+        if (Array.isArray(participants)) {
 
-		// ------------------------------------------------
-		// حذف الرسالة
-		// ------------------------------------------------
+            member = participants.find(p => {
 
-		try {
-			await conn.sendMessage(m.chat, {
-				delete: m.key
-			});
-		} catch (e) {
-			console.log(
-				'AntiLink Delete Error:',
-				e?.message || e
-			);
-		}
+                const jid =
+                    p.jid ||
+                    p.id ||
+                    p.phoneNumber ||
+                    '';
 
-		// ------------------------------------------------
-		// التنبيه الأول
-		// ------------------------------------------------
+                return jid === sender;
+            });
+        }
 
-		if (count === 1) {
-			await m.reply(
-				`╭━━━〔 ⚠️ 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃 〕━━━╮
+        if (
+            member?.admin === 'admin' ||
+            member?.admin === 'superadmin'
+        ) {
+            return;
+        }
+
+        // ------------------------------------------------
+        // مفتاح خاص بالمجموعة والعضو
+        // ------------------------------------------------
+
+        const warningKey =
+            `${m.chat}:${sender}`;
+
+        let count =
+            warnings.get(warningKey) || 0;
+
+        count++;
+
+        warnings.set(
+            warningKey,
+            count
+        );
+
+        const mention =
+            `@${sender.split('@')[0]}`;
+
+
+        // =================================================
+        // DELETE MESSAGE
+        // =================================================
+
+        try {
+
+            await conn.sendMessage(
+                m.chat,
+                {
+                    delete: m.key
+                }
+            );
+
+        } catch (deleteError) {
+
+            console.log(
+                '⚠️ AntiLink: فشل حذف الرابط:',
+                deleteError?.message || deleteError
+            );
+        }
+
+
+        // =================================================
+        // WARNING 1
+        // =================================================
+
+        if (count === 1) {
+
+            await conn.sendMessage(
+                m.chat,
+                {
+                    text:
+`╭━━━〔 ⚠️ 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃 〕━━━╮
 ┃
-┃ 🚫 ممنوع نشر روابط المجموعات
+┃ 🚫 ممنوع نشر روابط المجموعات!
 ┃
-┃ 👤 العضو: ${tag}
+┃ 👤 العضو: ${mention}
 ┃ ⚠️ التنبيه: 1/3
 ┃
-┃ 🗑️ تم حذف الرابط.
+┃ 🗑️ تحيد الرابط.
 ┃
 ┃ 🔔 عندك جوج فرص باقيين.
 ┃
 ╰━━━━━━━━━━━━━━━━━━╯`,
-				null,
-				{
-					mentions: [sender]
-				}
-			);
+                    mentions: [sender]
+                }
+            );
 
-			return;
-		}
+            return;
+        }
 
-		// ------------------------------------------------
-		// التنبيه الثاني
-		// ------------------------------------------------
 
-		if (count === 2) {
-			await m.reply(
-				`╭━━━〔 🚨 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃 〕━━━╮
+        // =================================================
+        // WARNING 2
+        // =================================================
+
+        if (count === 2) {
+
+            await conn.sendMessage(
+                m.chat,
+                {
+                    text:
+`╭━━━〔 🚨 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃 〕━━━╮
 ┃
 ┃ 🚫 عاودتي رسلتي رابط مجموعة!
 ┃
-┃ 👤 العضو: ${tag}
+┃ 👤 العضو: ${mention}
 ┃ ⚠️ التنبيه: 2/3
 ┃
-┃ 🗑️ تم حذف الرابط.
+┃ 🗑️ تحيد الرابط.
 ┃
-┃ 🔴 المرة الجاية = الطرد.
+┃ 🔴 هادي آخر فرصة!
+┃
+┃ 🚪 المرة الجاية = الطرد.
 ┃
 ╰━━━━━━━━━━━━━━━━━━╯`,
-				null,
-				{
-					mentions: [sender]
-				}
-			);
+                    mentions: [sender]
+                }
+            );
 
-			return;
-		}
+            return;
+        }
 
-		// ------------------------------------------------
-		// التنبيه الثالث = طرد
-		// ------------------------------------------------
 
-		if (count >= 3) {
-			await m.reply(
-				`╭━━━〔 🚪 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃 〕━━━╮
+        // =================================================
+        // WARNING 3 = KICK
+        // =================================================
+
+        if (count >= 3) {
+
+            await conn.sendMessage(
+                m.chat,
+                {
+                    text:
+`╭━━━〔 🚪 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃 〕━━━╮
 ┃
 ┃ 🚫 وصلتي لـ 3 تنبيهات!
 ┃
-┃ 👤 العضو: ${tag}
+┃ 👤 العضو: ${mention}
 ┃ ⚠️ التنبيهات: 3/3
+┃
+┃ 🗑️ تحيد الرابط.
 ┃
 ┃ 🚪 غادي يتم طردك دابا.
 ┃
 ╰━━━━━━━━━━━━━━━━━━╯`,
-				null,
-				{
-					mentions: [sender]
-				}
-			);
+                    mentions: [sender]
+                }
+            );
 
-			try {
-				await conn.groupParticipantsUpdate(
-					m.chat,
-					[sender],
-					'remove'
-				);
 
-				console.log(
-					`✅ AntiLink: ${sender} removed from ${m.chat}`
-				);
+            // ------------------------------------------------
+            // طرد العضو
+            // ------------------------------------------------
 
-			} catch (e) {
-				console.log(
-					'AntiLink Kick Error:',
-					e?.message || e
-				);
-			}
+            try {
 
-			warnings.delete(key);
-		}
+                await conn.groupParticipantsUpdate(
+                    m.chat,
+                    [sender],
+                    'remove'
+                );
 
-	} catch (e) {
-		console.log(
-			'❌ AntiLink Error:',
-			e?.stack || e
-		);
-	}
+                console.log(
+                    `✅ AntiLink: تم طرد ${sender}`
+                );
+
+            } catch (kickError) {
+
+                console.log(
+                    '❌ AntiLink: فشل الطرد:',
+                    kickError?.message || kickError
+                );
+
+                try {
+
+                    await conn.sendMessage(
+                        m.chat,
+                        {
+                            text:
+`❌ ماقدرتش نطرد ${mention}.
+
+📌 تأكد أن 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃 عندو Admin.`,
+                            mentions: [sender]
+                        }
+                    );
+
+                } catch {}
+            }
+
+
+            // تصفير التنبيهات
+            warnings.delete(warningKey);
+        }
+
+    } catch (error) {
+
+        // مهم جداً:
+        // أي خطأ هنا ما يوقفش البوت
+        console.log(
+            '❌ AntiLink Error:',
+            error?.stack || error
+        );
+    }
 };
 
-handler.before = true;
+
+// ======================================================
+// BEFORE
+// ======================================================
+
+handler.before = async function (m, ctx) {
+
+    try {
+
+        return await handler(
+            m,
+            ctx
+        );
+
+    } catch (error) {
+
+        console.log(
+            '❌ AntiLink Before Error:',
+            error?.stack || error
+        );
+
+        return false;
+    }
+};
+
+
+// ======================================================
+// PLUGIN SETTINGS
+// ======================================================
 
 handler.group = true;
+
 handler.botAdmin = true;
+
+// ما عندوش أمر
+handler.command = false;
 
 export default handler;
