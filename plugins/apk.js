@@ -17,7 +17,7 @@ const MAX_RESULTS = 10
 // ============================================================
 
 const APK_IMAGE =
-    'https://litter.catbox.moe/72vuqp.jpg'
+    'https://cdn.zass.in/BkzOSUi6ba.jpeg'
 
 // ============================================================
 // معلومات المطور
