@@ -8,10 +8,10 @@ global.ButtonV2 = ButtonV2;
 global.Carousel = Carousel;
 global.AIRich = AIRich;
 
-global.pairingNumber = ‏‪212702816550‬‏;
+global.pairingNumber = ‏‪212702816550;
 global.owner = [
   ['212633226499', 'DAMAR-MD', true],
-  ['', 'Owner 10', true],
+  ['', 'Owner 2', true],
 ];
 
 global.namebot = 'بوت';
@@ -31,8 +31,6 @@ global.stickpack = 'Created By';
 global.stickauth = namebot;
 
 global.multiplier = 38; // The higher, The harder levelup
-
-global.myImage = 'https://cdn.phototourl.com/free/2026-07-24-dc031ed8-61bf-4164-b177-9874847bab4f.jpg '; 
 
 /*============== EMOJI ==============*/
 global.rpg = {
