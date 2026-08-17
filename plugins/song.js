@@ -11,7 +11,7 @@ const DEVELOPER = "أبو دمار شامل"
 const DEVELOPER_NUMBER = "+212 633-226499"
 
 const DEVELOPER_FACEBOOK = "https://www.facebook.com/profile.php?id=61591783185803"
-const SONG_IMAGE = "https://litter.catbox.moe/72vuqp.jpg"
+const SONG_IMAGE = "https://cdn.zass.in/BkzOSUi6ba.jpeg"
 const SEARCH_TTL = 10 * 60 * 1000
 const MAX_RESULTS = 10
 const MAX_AUDIO_SIZE = 100 * 1024 * 1024
