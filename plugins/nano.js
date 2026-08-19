@@ -1,1386 +1,1233 @@
-import moment from 'moment-timezone'
-import os from 'os'
-
-const NEW_DAYS = 30
-
-// 🎵 صوت المنيو
-const MENU_AUDIO = 'https://litter.catbox.moe/yn9qew.opus'
-
-// 👤 Facebook المطور
-const DEVELOPER_FACEBOOK =
-    'https://www.facebook.com/profile.php?id=61591783185803'
-
-// 👑 رقم المالك بدون + أو مسافات
-const OWNER_WHATSAPP = '212633226499'
-
-// 💬 الرسالة التي تظهر جاهزة عند الضغط على تواصل مع المالك
-const OWNER_MESSAGE =
-    'مرحبا بيك يا مطور بوت DAMAR-MD 👑'
-
-
-// ============================================================
-// Bold Unicode
-// ============================================================
-
-function toBoldUnicode(str) {
-
-    const bold = {
-        a:'𝐚', b:'𝐛', c:'𝐜', d:'𝐝', e:'𝐞', f:'𝐟',
-        g:'𝐠', h:'𝐡', i:'𝐢', j:'𝐣', k:'𝐤', l:'𝐥',
-        m:'𝐦', n:'𝐧', o:'𝐨', p:'𝐩', q:'𝐪', r:'𝐫',
-        s:'𝐬', t:'𝐭', u:'𝐮', v:'𝐯', w:'𝐰', x:'𝐱',
-        y:'𝐲', z:'𝐳',
-
-        A:'𝐀', B:'𝐁', C:'𝐂', D:'𝐃', E:'𝐄', F:'𝐅',
-        G:'𝐆', H:'𝐇', I:'𝐈', J:'𝐉', K:'𝐊', L:'𝐋',
-        M:'𝐌', N:'𝐍', O:'𝐎', P:'𝐏', Q:'𝐐', R:'𝐑',
-        S:'𝐒', T:'𝐓', U:'𝐔', V:'𝐕', W:'𝐖', X:'𝐗',
-        Y:'𝐘', Z:'𝐙',
-
-        0:'𝟎', 1:'𝟏', 2:'𝟐', 3:'𝟑', 4:'𝟒',
-        5:'𝟓', 6:'𝟔', 7:'𝟕', 8:'𝟖', 9:'𝟗'
-    }
-
-    return String(str)
-        .split('')
-        .map(c => bold[c] || c)
-        .join('')
-}
-
-
-// ============================================================
-// ألوان الأقسام
-// ============================================================
-
-const categoryColors = {
-
-    main: '🔵',
-    ai: '🟣',
-    downloader: '🟢',
-    uploader: '🟢',
-    editor: '🟠',
-    sticker: '🟡',
-    tools: '⚪',
-    infobot: '🔵',
-    group: '🟢',
-    owner: '🔴'
-
-}
-
-
-// ============================================================
-// الترجمة
-// ============================================================
-
-const translations = {
-
-    ar: {
-
-        prefix: 'العلامة',
-        uptime: 'الوقت ديال الخدمة',
-        ram: 'الذاكرة',
-        status: 'الحالة',
-
-        commands: 'الأوامر',
-        plugins: 'البلاگنات',
-        users: 'المستخدمين',
-        views: 'عدد المرات تحل المنيو',
-
-        tapMenu:
-            '✦ ضغط على 📂 لائحة الأوامر لتحت باش تبدل القسم',
-
-        notFound:
-            'هاد القسم مكاينش، غادي نوريك المنيو كامل.',
-
-        empty:
-            '(خاوي)',
-
-        whatsNew:
-            'الجديد',
-
-        newDesc:
-            'أوامر تزادو فهاد',
-
-        days:
-            'يوم',
-
-        noNew:
-            '(مكاين حتى أمر جديد دابا)',
-
-        tips: [
-
-            '💡 نصيحة: كتب .menu <القسم> باش تدخل نيشان للقسم.',
-
-            '💡 نصيحة: 🆕 حدا الأمر كيعني تزاد مؤخرا.',
-
-            '💡 نصيحة: 🔥 كيعني هاد الأمر مستعمل بزاف.',
-
-            '💡 نصيحة: 🔒 كيعني عندو عدد محدود ديال الاستعمال.',
-
-            '💡 نصيحة: 💎 كيعني خاصو بريميوم.',
-
-            '💡 نصيحة: كتب .menu new باش تشوف الجديد كامل.',
-
-            '💡 نصيحة: كتب .lang ar|fr|en باش تبدل اللغة.'
-
-        ]
-
-    },
-
-    en: {
-
-        prefix: 'Prefix',
-        uptime: 'Uptime',
-        ram: 'RAM',
-        status: 'Status',
-
-        commands: 'Commands',
-        plugins: 'Plugins',
-        users: 'Users',
-        views: 'Menu Views',
-
-        tapMenu:
-            '✦ Tap 📂 Menu List below to switch category',
-
-        notFound:
-            'Category not found, showing full menu.',
-
-        empty:
-            '(empty)',
-
-        whatsNew:
-            "What's New",
-
-        newDesc:
-            'Commands added in the last',
-
-        days:
-            'days',
-
-        noNew:
-            '(no new commands right now)',
-
-        tips: [
-
-            '💡 Tip: type .menu <category> to jump to a section.',
-
-            '💡 Tip: 🆕 means the command was added recently.',
-
-            '💡 Tip: 🔥 marks popular commands.',
-
-            '💡 Tip: 🔒 means the command has a usage limit.',
-
-            '💡 Tip: 💎 means premium.',
-
-            '💡 Tip: type .menu new to see new commands.',
-
-            '💡 Tip: type .lang ar|fr|en to change language.'
-
-        ]
-
-    },
-
-    fr: {
-
-        prefix: 'Préfixe',
-        uptime: 'Uptime',
-        ram: 'RAM',
-        status: 'Statut',
-
-        commands: 'Commandes',
-        plugins: 'Plugins',
-        users: 'Utilisateurs',
-        views: 'Vues du menu',
-
-        tapMenu:
-            '✦ Appuyez sur 📂 Menu List ci-dessous pour changer de catégorie',
-
-        notFound:
-            'Catégorie introuvable, menu complet affiché.',
-
-        empty:
-            '(vide)',
-
-        whatsNew:
-            'Nouveautés',
-
-        newDesc:
-            'Commandes ajoutées ces derniers',
-
-        days:
-            'jours',
-
-        noNew:
-            '(aucune nouvelle commande pour le moment)',
-
-        tips: [
-
-            '💡 Astuce : tapez .menu <catégorie>.',
-
-            '💡 Astuce : 🆕 signifie nouveau.',
-
-            '💡 Astuce : 🔥 signifie populaire.',
-
-            '💡 Astuce : 🔒 signifie limite d’utilisation.',
-
-            '💡 Astuce : 💎 signifie premium.',
-
-            '💡 Astuce : tapez .menu new.',
-
-            '💡 Astuce : tapez .lang ar|fr|en.'
-
-        ]
-
-    }
-
-}
-
-
-// ============================================================
-// Translation
-// ============================================================
-
-function t(lang, key) {
-
-    const dict =
-        translations[lang] || translations.ar
-
-    return dict[key] !== undefined
-        ? dict[key]
-        : translations.ar[key]
-
-}
-
-
-// ============================================================
-// Uptime
-// ============================================================
-
-function clockString(ms) {
-
-    const d =
-        Math.floor(ms / 86400000)
-
-    const h =
-        Math.floor(ms / 3600000) % 24
-
-    const m =
-        Math.floor(ms / 60000) % 60
-
-    const s =
-        Math.floor(ms / 1000) % 60
-
-    const time = [
-        h,
-        m,
-        s
-    ]
-        .map(v => String(v).padStart(2, '0'))
-        .join(':')
-
-    return d > 0
-        ? `${d}يوم ${time}`
-        : time
-}
-
-
-// ============================================================
-// RAM
-// ============================================================
-
-function ramUsage() {
-
-    const used =
-        process.memoryUsage().rss
-
-    const total =
-        os.totalmem()
-
-    return `${(
-        used /
-        1024 /
-        1024
-    ).toFixed(0)}MB / ${(
-        total /
-        1024 /
-        1024 /
-        1024
-    ).toFixed(0)}GB`
-}
-
-
-// ============================================================
-// التحية
-// ============================================================
-
-function ucapan() {
-
-    const hour =
-        Number(
-            moment()
-                .tz('Africa/Casablanca')
-                .format('HH')
-        )
-
-    if (hour >= 5 && hour < 12)
-        return 'صباح الخير ☀️'
-
-    if (hour >= 12 && hour < 18)
-        return 'مساء الخير 🌤️'
-
-    return 'مساء النور 🌙'
-}
-
-
-// ============================================================
-// Handler
-// ============================================================
-
-const handler = async (
-    m,
-    {
-        conn,
-        usedPrefix: _p,
-        command,
-        isOwner,
-        args
-    }
-) => {
+/**
+ * 🍌 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃 | Nano-Banana AI V5
+ * Developer: +212 633-226499
+ *
+ * ✅ توليد 4 صور مختلفة من النص
+ * ✅ تعديل صورة واحدة وإخراج 4 نسخ مختلفة منها
+ * ✅ نفس الصورة الأصلية تبقى هي المرجع في جميع النتائج
+ * ✅ دمج حتى 4 صور بواسطة Nano Pro
+ * ✅ Retry تلقائي مع 503 / 502 / 504
+ */
+
+import axios from 'axios'
+import FormData from 'form-data'
+
+const BOT_NAME = '𝐃𝐀𝐌𝐀𝐑-𝐌𝐃'
+const DEV_NUMBER = '+212 633-226499'
+
+/* =========================================================
+   Sessions
+========================================================= */
+
+const bananaSession = {}
+
+/* =========================================================
+   Settings
+========================================================= */
+
+const MAX_IMAGES = 4
+const MAX_RETRIES = 3
+const RETRY_DELAY = 5000
+const POLL_DELAY = 5000
+const MAX_POLLS = 25
+
+/* =========================================================
+   Sleep
+========================================================= */
+
+const sleep = ms =>
+  new Promise(resolve => setTimeout(resolve, ms))
+
+/* =========================================================
+   Axios GET + Retry
+========================================================= */
+
+async function getWithRetry(url, options = {}) {
+
+  let lastError = null
+
+  for (
+    let attempt = 1;
+    attempt <= MAX_RETRIES;
+    attempt++
+  ) {
 
     try {
 
-        await m.react('⏳')
+      return await axios.get(
+        url,
+        options
+      )
 
-        // ========================================================
-        // الأقسام
-        // ========================================================
+    } catch (error) {
 
-        const allTags = {
+      lastError = error
 
-            main: {
-                title: 'القائمة الرئيسية',
-                emoji: '🏠'
-            },
+      const status =
+        error?.response?.status
 
-            ai: {
-                title: 'قائمة الذكاء الاصطناعي',
-                emoji: '🤖'
-            },
+      console.error(
+        `🍌 API Attempt ${attempt}/${MAX_RETRIES} | Status: ${status || 'unknown'}`
+      )
 
-            downloader: {
-                title: 'قائمة التحميل',
-                emoji: '📥'
-            },
+      const retryable =
+        status === 502 ||
+        status === 503 ||
+        status === 504 ||
+        error.code === 'ECONNABORTED' ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ECONNRESET' ||
+        !error.response
 
-            uploader: {
-                title: 'قائمة الرفع',
-                emoji: '📤'
-            },
+      if (!retryable) {
+        throw error
+      }
 
-            editor: {
-                title: 'قائمة التعديل',
-                emoji: '🎨'
-            },
+      if (
+        attempt < MAX_RETRIES
+      ) {
 
-            sticker: {
-                title: 'قائمة الملصقات',
-                emoji: '🎟️'
-            },
+        await sleep(
+          RETRY_DELAY * attempt
+        )
+      }
+    }
+  }
 
-            tools: {
-                title: 'قائمة الأدوات',
-                emoji: '🛠️'
-            },
+  throw lastError
+}
 
-            infobot: {
-                title: 'قائمة المعلومات',
-                emoji: 'ℹ️'
-            },
+/* =========================================================
+   Upload Image
+========================================================= */
 
-            group: {
-                title: 'قائمة المجموعات',
-                emoji: '👥'
-            },
+async function uploadMedia(m) {
 
-            owner: {
-                title: 'قائمة المالك',
-                emoji: '👑'
-            }
+  try {
 
+    const q =
+      m.quoted
+        ? m.quoted
+        : m
+
+    const mimetype =
+      q.mimetype ||
+      q.msg?.mimetype ||
+      ''
+
+    if (
+      !/image/i.test(mimetype)
+    ) {
+      return null
+    }
+
+    const media =
+      await q.download()
+
+    if (!media) {
+      return null
+    }
+
+    const form =
+      new FormData()
+
+    form.append(
+      'file',
+      media,
+      {
+        filename: 'image.jpg',
+        contentType: mimetype
+      }
+    )
+
+    form.append(
+      'type',
+      'permanent'
+    )
+
+    const response =
+      await axios.post(
+        'https://tmp.malvryx.dev/upload',
+        form,
+        {
+          headers:
+            form.getHeaders(),
+
+          timeout: 60000,
+
+          maxBodyLength:
+            Infinity,
+
+          maxContentLength:
+            Infinity
         }
-
-
-        // ========================================================
-        // القسم المطلوب
-        // ========================================================
-
-        let teks =
-            String(args?.[0] || '').toLowerCase()
-
-        const showNewOnly =
-            teks === 'new'
-
-        const invalidCategory =
-            teks &&
-            !showNewOnly &&
-            !Object.keys(allTags).includes(teks)
-
-        if (
-            showNewOnly ||
-            !Object.keys(allTags).includes(teks)
-        ) {
-            teks = 'all'
-        }
-
-        let tags =
-            teks === 'all'
-                ? { ...allTags }
-                : { [teks]: allTags[teks] }
-
-        if (!isOwner)
-            delete tags.owner
-
-        if (!m.isGroup)
-            delete tags.group
-
-
-        // ========================================================
-        // المستخدم
-        // ========================================================
-
-        global.db.data.users[m.sender] =
-            global.db.data.users[m.sender] || {}
-
-        const user =
-            global.db.data.users[m.sender]
-
-        const lang =
-            ['ar', 'fr', 'en'].includes(user.lang)
-                ? user.lang
-                : 'ar'
-
-
-        // ========================================================
-        // الصوت
-        // ========================================================
-
-        try {
-
-            await conn.sendMessage(
-                m.chat,
-                {
-                    audio: {
-                        url: MENU_AUDIO
-                    },
-                    mimetype: 'audio/mpeg',
-                    ptt: false
-                },
-                {
-                    quoted: m
-                }
-            )
-
-        } catch (e) {
-
-            console.log('Menu audio error:', e)
-
-        }
-
-
-        // ========================================================
-        // الإحصائيات
-        // ========================================================
-
-        const now =
-            Date.now()
-
-        global.db.data.stats =
-            global.db.data.stats || {}
-
-        global.db.data.stats.pluginFirstSeen =
-            global.db.data.stats.pluginFirstSeen || {}
-
-        const firstSeenMap =
-            global.db.data.stats.pluginFirstSeen
-
-        const isFirstBoot =
-            Object.keys(firstSeenMap).length === 0
-
-
-        // ========================================================
-        // Plugins
-        // ========================================================
-
-        const help =
-            Object.entries(global.plugins || {})
-
-                .filter(
-                    ([_, p]) =>
-                        p &&
-                        !p.disabled
-                )
-
-                .map(
-                    ([filename, p]) => {
-
-                        if (!(filename in firstSeenMap)) {
-
-                            firstSeenMap[filename] =
-                                isFirstBoot
-                                    ? now - ((NEW_DAYS + 1) * 86400000)
-                                    : now
-
-                        }
-
-                        const isNewBool =
-                            now -
-                            firstSeenMap[filename] <
-                            NEW_DAYS * 86400000
-
-                        const pluginHelp =
-                            Array.isArray(p.help)
-                                ? p.help
-                                : p.help
-                                    ? [p.help]
-                                    : []
-
-                        const pluginTags =
-                            Array.isArray(p.tags)
-                                ? p.tags
-                                : p.tags
-                                    ? [p.tags]
-                                    : []
-
-                        return {
-
-                            help: pluginHelp,
-
-                            tags: pluginTags,
-
-                            prefix:
-                                'customPrefix' in p,
-
-                            limit:
-                                p.limit
-                                    ? '🔒'
-                                    : '',
-
-                            premium:
-                                p.premium
-                                    ? '💎'
-                                    : '',
-
-                            owner:
-                                p.owner
-                                    ? '🄾'
-                                    : '',
-
-                            isNew:
-                                isNewBool
-                                    ? '🆕'
-                                    : '',
-
-                            isNewBool,
-
-                            popular:
-                                p.popular
-                                    ? '🔥'
-                                    : ''
-
-                        }
-
-                    }
-                )
-
-
-        // ========================================================
-        // الإحصائيات
-        // ========================================================
-
-        const totalcmd =
-            help.reduce(
-                (a, p) =>
-                    a + p.help.length,
-                0
-            )
-
-        const totalplugins =
-            help.length
-
-        const totalNew =
-            help
-                .filter(p => p.isNewBool)
-                .reduce(
-                    (a, p) =>
-                        a + p.help.length,
-                    0
-                )
-
-        const countsByTag =
-            Object.keys(allTags)
-                .map(
-                    tag =>
-                        help
-                            .filter(
-                                p =>
-                                    p.tags.includes(tag)
-                            )
-                            .reduce(
-                                (a, p) =>
-                                    a + p.help.length,
-                                0
-                            )
-                )
-
-        const maxCount =
-            Math.max(
-                ...countsByTag,
-                1
-            )
-
-
-        // ========================================================
-        // Rows ديال لائحة الأوامر
-        // ========================================================
-
-        const rows = []
-
-        for (const tag of Object.keys(allTags)) {
-
-            if (
-                tag === 'owner' &&
-                !isOwner
-            )
-                continue
-
-            if (
-                tag === 'group' &&
-                !m.isGroup
-            )
-                continue
-
-            const count =
-                help
-                    .filter(
-                        p =>
-                            p.tags.includes(tag)
-                    )
-                    .reduce(
-                        (a, p) =>
-                            a + p.help.length,
-                        0
-                    )
-
-            rows.push({
-
-                title:
-                    `${allTags[tag].emoji} ${allTags[tag].title}`,
-
-                description:
-                    `${count} أمر`,
-
-                id:
-                    `${_p}${command} ${tag}`
-
-            })
-
-        }
-
-        rows.push({
-
-            title:
-                `🆕 ${t(lang, 'whatsNew')}`,
-
-            description:
-                `${totalNew} أمر`,
-
-            id:
-                `${_p}${command} new`
-
-        })
-
-
-        // ========================================================
-        // شكل المنيو
-        // ========================================================
-
-        const defaultMenu = {
-
-            before: `╭━━━⪩ ${toBoldUnicode('DAMAR-MD')} ⪨━━━⬣
-┃ 👋 ${ucapan()}، %name
-┃ 🤖 البوت: ${toBoldUnicode('DAMAR-MD')}
-┃ 👑 المطور: أبو دمار شامل
-┃ 📞 المالك: +212 633-226499
+      )
+
+    return (
+      response.data?.cdnUrl ||
+      response.data?.directUrl ||
+      response.data?.url ||
+      null
+    )
+
+  } catch (error) {
+
+    console.error(
+      '🍌 Upload Error:',
+      error?.response?.data ||
+      error.message
+    )
+
+    return null
+  }
+}
+
+/* =========================================================
+   Guide
+========================================================= */
+
+async function showGuide(
+  m,
+  conn,
+  usedPrefix,
+  command
+) {
+
+  return conn.reply(
+    m.chat,
+
+`╭━━━〔 🍌 ${BOT_NAME} 〕━━━╮
 ┃
-┃ 🔧 ${t(lang, 'prefix')}: %prefix
-┃ ✨ النسخة: %version
-┃ 📅 %week، %date
-┃ ⏱ ${t(lang, 'uptime')}: %uptime
-┃ 💾 ${t(lang, 'ram')}: %ram
-┃ 📡 ${t(lang, 'status')}: %status
+┃ 🤖 *Nano Banana AI*
 ┃
-┃ 📦 ${t(lang, 'commands')}: %totalcmd
-┃ 🔌 ${t(lang, 'plugins')}: %totalplugins
-┃ 👥 ${t(lang, 'users')}: %rtotalreg/%totalreg
-┃ 👁 ${t(lang, 'views')}: %views
-╰━━━━━━━━━━━━━━━⬣
-%tip
-%readmore`,
+┃ ✨ توليد الصور
+┃ 🎨 تعديل الصور
+┃ 🖼️ 4 نتائج مختلفة
+┃ 🔥 دمج حتى 4 صور
+┃
+╰━━━━━━━━━━━━━━━━━━╯
 
-            newBefore:
-                `╭━━━⪩ 🆕 ${toBoldUnicode('الجديد')} ⪨━━━⬣
-┃ أوامر تزادو فهاد ${NEW_DAYS} يوم
-╰━━━━━━━━━━━━━━━⬣
-%readmore`,
+📌 *توليد من وصف:*
 
-            header:
-                '\n╭─⪩ %emoji %color %category ⪨─ (%count)\n│ %bar',
+${usedPrefix}nano شاب مغربي وسط مدينة جميلة
 
-            body:
-                '│ %index. %cmd%flags',
+➡️ غادي نعطيك 4 صور مختلفة.
 
-            footer:
-                '╰────────────⬣',
+━━━━━━━━━━━━━━━━━━
 
-            after:
-                `\n> ${t(lang, 'tapMenu')}`
+🎨 *تعديل صورة:*
 
-        }
+رد على الصورة وكتب:
 
+${usedPrefix}nano بدل الخلفية وخليها فالطبيعة
 
-        // ========================================================
-        // بناء النص
-        // ========================================================
+➡️ نفس الصورة الأصلية
+➡️ 4 نتائج مختلفة
+➡️ نفس الشخص والعناصر
+➡️ الاختلاف غير فالشكل والتكوين والإضاءة
 
-        let text = ''
+━━━━━━━━━━━━━━━━━━
 
+🖼️ *Nano Pro:*
 
-        if (showNewOnly) {
+${usedPrefix}nanopro
 
-            const sections = []
+صيفط حتى 4 تصاور.
 
-            for (const tag of Object.keys(allTags)) {
+من بعد:
 
-                const filtered =
-                    help.filter(
-                        p =>
-                            p.tags.includes(tag)
-                    )
+${usedPrefix}nanopro done جمع الأشخاص فصورة وحدة
 
-                const list = []
+━━━━━━━━━━━━━━━━━━
+👨‍💻 *المطور:* ${DEV_NUMBER}
+🤖 *البوت:* ${BOT_NAME}
+╰━━━━━━━━━━━━━━━━━━╯`,
+    m
+  )
+}
 
-                for (const p of filtered) {
+/* =========================================================
+   Wait For Result
+========================================================= */
 
-                    for (const h of p.help) {
+async function waitForResult(taskId) {
 
-                        if (!p.isNewBool)
-                            continue
+  for (
+    let attempt = 1;
+    attempt <= MAX_POLLS;
+    attempt++
+  ) {
 
-                        const cmd =
-                            p.prefix
-                                ? h
-                                : `${_p}${h}`
+    await sleep(
+      POLL_DELAY
+    )
 
-                        list.push(cmd)
+    try {
 
-                    }
-
-                }
-
-                list.sort(
-                    (a, b) =>
-                        a.localeCompare(b)
-                )
-
-                if (!list.length)
-                    continue
-
-                const items =
-                    list.map(
-                        (cmd, i) =>
-                            defaultMenu.body
-
-                                .replace(
-                                    /%index/g,
-                                    String(i + 1).padStart(2, '0')
-                                )
-
-                                .replace(
-                                    /%cmd/g,
-                                    cmd
-                                )
-
-                                .replace(
-                                    /%flags/g,
-                                    ' 🆕'
-                                )
-                    )
-
-                sections.push(
-
-                    `${defaultMenu.header
-
-                        .replace(
-                            '%emoji',
-                            allTags[tag].emoji
-                        )
-
-                        .replace(
-                            '%color',
-                            categoryColors[tag] || '⚪'
-                        )
-
-                        .replace(
-                            '%category',
-                            toBoldUnicode(allTags[tag].title)
-                        )
-
-                        .replace(
-                            '%count',
-                            list.length
-                        )
-
-                        .replace(
-                            '%bar',
-                            ''
-                        )}
-
-${items.join('\n')}
-${defaultMenu.footer}`
-
-                )
-
-            }
-
-            text = [
-
-                defaultMenu.newBefore,
-
-                sections.length
-                    ? sections.join('\n')
-                    : t(lang, 'noNew')
-
-            ].join('\n')
-
-        } else {
-
-            const parts = [
-
-                defaultMenu.before
-
-            ]
-
-            for (const tag of Object.keys(tags)) {
-
-                const filtered =
-                    help.filter(
-                        p =>
-                            p.tags.includes(tag)
-                    )
-
-                const list = []
-
-                for (const p of filtered) {
-
-                    for (const h of p.help) {
-
-                        const cmd =
-                            p.prefix
-                                ? h
-                                : `${_p}${h}`
-
-                        const flags = [
-
-                            p.isNew,
-                            p.popular,
-                            p.owner,
-                            p.premium,
-                            p.limit
-
-                        ]
-                            .filter(Boolean)
-                            .join(' ')
-
-                        list.push({
-
-                            cmd,
-
-                            flags:
-                                flags
-                                    ? ` ${flags}`
-                                    : ''
-
-                        })
-
-                    }
-
-                }
-
-                list.sort(
-                    (a, b) =>
-                        a.cmd.localeCompare(b.cmd)
-                )
-
-                const items =
-                    list.map(
-                        (entry, i) =>
-                            defaultMenu.body
-
-                                .replace(
-                                    /%index/g,
-                                    String(i + 1).padStart(2, '0')
-                                )
-
-                                .replace(
-                                    /%cmd/g,
-                                    entry.cmd
-                                )
-
-                                .replace(
-                                    /%flags/g,
-                                    entry.flags
-                                )
-                    )
-
-                const count =
-                    list.length
-
-                const filled =
-                    Math.max(
-                        1,
-                        Math.round(
-                            (count / maxCount) * 10
-                        )
-                    )
-
-                const bar =
-                    '▰'.repeat(filled) +
-                    '▱'.repeat(
-                        Math.max(
-                            0,
-                            10 - filled
-                        )
-                    )
-
-                parts.push(
-
-                    `${defaultMenu.header
-
-                        .replace(
-                            '%emoji',
-                            tags[tag].emoji
-                        )
-
-                        .replace(
-                            '%color',
-                            categoryColors[tag] || '⚪'
-                        )
-
-                        .replace(
-                            '%category',
-                            toBoldUnicode(tags[tag].title)
-                        )
-
-                        .replace(
-                            '%count',
-                            count
-                        )
-
-                        .replace(
-                            '%bar',
-                            bar
-                        )}
-
-${items.join('\n') || `│ ${t(lang, 'empty')}`}
-${defaultMenu.footer}`
-
-                )
-
-            }
-
-            if (invalidCategory) {
-
-                parts.push(
-                    `\n⚠️ ${t(lang, 'notFound')}`
-                )
-
-            }
-
-            parts.push(
-                defaultMenu.after
-            )
-
-            text =
-                parts
-                    .filter(Boolean)
-                    .join('\n')
-
-        }
-
-
-        // ========================================================
-        // معلومات المستخدم
-        // ========================================================
-
-        const name =
-            user.registered
-                ? user.name
-                : (
-                    conn.getName
-                        ? conn.getName(m.sender)
-                        : 'صديقي'
-                )
-
-        const uptime =
-            clockString(
-                process.uptime() * 1000
-            )
-
-        const ram =
-            ramUsage()
-
-        let status =
-            'Online 🟢'
-
-        try {
-
-            if (typeof checkStatus === 'function') {
-
-                status =
-                    await checkStatus()
-
-            }
-
-        } catch {
-
-            status =
-                'Online 🟢'
-
-        }
-
-
-        const totalreg =
-            Object.keys(
-                global.db.data.users || {}
-            ).length
-
-        const rtotalreg =
-            Object.values(
-                global.db.data.users || {}
-            )
-                .filter(
-                    u =>
-                        u &&
-                        u.registered
-                )
-                .length
-
-
-        global.db.data.stats.menuViews =
-            (
-                global.db.data.stats.menuViews ||
-                0
-            ) + 1
-
-        const views =
-            global.db.data.stats.menuViews
-
-
-        // ========================================================
-        // التاريخ
-        // ========================================================
-
-        const d =
-            new Date()
-
-        const locale =
-            'ar-MA'
-
-        const week =
-            d.toLocaleDateString(
-                locale,
-                {
-                    weekday: 'long'
-                }
-            )
-
-        const date =
-            d.toLocaleDateString(
-                locale,
-                {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                }
-            )
-
-        const dayOfYear =
-            Math.floor(
-                (
-                    d -
-                    new Date(
-                        d.getFullYear(),
-                        0,
-                        0
-                    )
-                ) / 86400000
-            )
-
-        const tipList =
-            t(lang, 'tips')
-
-        const tip =
-            tipList[
-                dayOfYear % tipList.length
-            ]
-
-
-        // ========================================================
-        // استبدال البيانات
-        // ========================================================
-
-        const replace = {
-
-            prefix: _p,
-
-            p: _p,
-
-            uptime,
-
-            me:
-                conn.user?.name ||
-                'DAMAR-MD',
-
-            name,
-
-            week,
-
-            date,
-
-            totalreg,
-
-            rtotalreg,
-
-            totalcmd,
-
-            totalplugins,
-
-            ram,
-
-            status,
-
-            version:
-                global.version ||
-                '1.0.0',
-
-            tip,
-
-            views,
-
-            readmore:
-                String.fromCharCode(8206).repeat(4001)
-
-        }
-
-
-        const finalText =
-            text.replace(
-                /%([a-zA-Z]+)/g,
-                (_, key) =>
-                    replace[key] !== undefined
-                        ? replace[key]
-                        : `%${key}`
-            )
-
-
-        // ========================================================
-        // 🔗 رابط التواصل مع المالك
-        // ========================================================
-
-        const ownerUrl =
-            `https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent(OWNER_MESSAGE)}`
-
-
-        // ========================================================
-        // إرسال المنيو
-        // ========================================================
-
-        await conn.sendButton(
-
-            m.chat,
-
-            {
-
-                image: {
-
-                    url:
-                        'https://cdn.zass.in/nkPYlKd6FQ.jpeg'
-
-                },
-
-                caption:
-                    finalText,
-
-                footer:
-                    `DAMAR-MD • أبو دمار شامل`,
-
-                buttons: [
-
-                    // ==================================================
-                    // 1 - لائحة الأوامر
-                    // ==================================================
-
-                    {
-
-                        name:
-                            'single_select',
-
-                        buttonParamsJson:
-                            JSON.stringify({
-
-                                title:
-                                    '📂 لائحة الأوامر',
-
-                                sections: [
-
-                                    {
-
-                                        title:
-                                            '🤖 DAMAR-MD',
-
-                                        rows
-
-                                    }
-
-                                ]
-
-                            })
-
-                    },
-
-
-                    // ==================================================
-                    // 2 - الجديد
-                    // ==================================================
-
-                    {
-
-                        name:
-                            'quick_reply',
-
-                        buttonParamsJson:
-                            JSON.stringify({
-
-                                display_text:
-                                    `🆕 ${t(lang, 'whatsNew')}`,
-
-                                id:
-                                    `${_p}${command} new`
-
-                            })
-
-                    },
-
-
-                    // ==================================================
-                    // 3 - حساب المطور
-                    // ==================================================
-
-                    {
-
-                        name:
-                            'cta_url',
-
-                        buttonParamsJson:
-                            JSON.stringify({
-
-                                display_text:
-                                    '👤 حساب المطور',
-
-                                url:
-                                    DEVELOPER_FACEBOOK
-
-                            })
-
-                    },
-
-
-                    // ==================================================
-                    // 4 - تواصل مع المالك
-                    // ==================================================
-
-                    {
-
-                        name:
-                            'cta_url',
-
-                        buttonParamsJson:
-                            JSON.stringify({
-
-                                display_text:
-                                    '👑 تواصل مع المالك',
-
-                                url:
-                                    ownerUrl
-
-                            })
-
-                    }
-
-                ]
-
-            },
-
-            {
-                quoted:
-                    m
-            }
-
+      const response =
+        await getWithRetry(
+          `https://omegatech-api.dixonomega.tech/api/ai/nano-banana2-result?task_id=${encodeURIComponent(taskId)}`,
+          {
+            timeout: 30000
+          }
         )
 
+      const data =
+        response.data
+
+      if (
+        data?.status === 'completed' &&
+        data?.image_url
+      ) {
+
+        return data.image_url
+      }
+
+      if (
+        data?.status === 'failed'
+      ) {
+
+        return null
+      }
+
+    } catch (error) {
+
+      const status =
+        error?.response?.status
+
+      /*
+       * إذا كان خطأ مؤقت نخلي العملية تكمل
+       */
+
+      if (
+        status === 502 ||
+        status === 503 ||
+        status === 504
+      ) {
+
+        console.log(
+          `🍌 Poll temporary error: ${status}`
+        )
+
+        continue
+      }
+
+      throw error
+    }
+  }
+
+  return null
+}
+
+/* =========================================================
+   EDIT PROMPTS
+   مهم:
+   نفس الصورة الأصلية + نفس الشخص
+   غير اختلاف بسيط بين النتائج
+========================================================= */
+
+function getEditPrompt(
+  originalPrompt,
+  index
+) {
+
+  const variations = [
+
+    `
+VERSION 1:
+Create the edited image using the EXACT SAME original person,
+same identity, same face, same body, same clothing structure,
+same main objects and same scene composition.
+Apply ONLY the user's requested edit.
+Use a natural realistic composition and normal camera angle.
+`,
+
+    `
+VERSION 2:
+Use the EXACT SAME uploaded image as the primary reference.
+Preserve the same person, identity, face, body, important objects
+and all details that were not requested to change.
+Apply the user's requested edit.
+Make only the visual composition slightly different,
+with a different camera angle or framing.
+Do NOT replace the person.
+`,
+
+    `
+VERSION 3:
+The uploaded image is the mandatory reference.
+Keep the SAME person and recognizable identity,
+same main elements and same requested subject.
+Apply ONLY the requested modification.
+Use a different professional lighting setup and framing,
+while keeping the original person and scene recognizable.
+`,
+
+    `
+VERSION 4:
+Generate another variation based directly on the SAME uploaded image.
+Preserve the person's identity, face, body and main visual elements.
+Apply the exact requested edit.
+Make the result visually different through composition,
+camera perspective, lighting and background details,
+but DO NOT create a different person.
+`
+  ]
+
+  return `
+USER EDIT REQUEST:
+${originalPrompt}
+
+IMPORTANT:
+The uploaded image is the ORIGINAL SOURCE IMAGE.
+
+You MUST use the uploaded image as the main reference.
+
+Keep the same person and identity.
+Keep the same face and recognizable features.
+Keep the same main objects.
+Keep everything that the user did NOT ask to change.
+
+Only perform the requested modification.
+
+Do not invent a completely different person.
+Do not replace the subject.
+Do not remove important original elements unless the user requested it.
+
+This is result ${index + 1} of 4.
+
+${variations[index]}
+`
+}
+
+/* =========================================================
+   EDIT ONE IMAGE
+========================================================= */
+
+async function editOneImage(
+  imageUrl,
+  prompt,
+  index
+) {
+
+  const finalPrompt =
+    getEditPrompt(
+      prompt,
+      index
+    )
+
+  try {
+
+    console.log(
+      `🎨 Editing same image ${index + 1}/4`
+    )
+
+    const response =
+      await getWithRetry(
+        `https://omegatech-api.dixonomega.tech/api/ai/nano-banana2?prompt=${encodeURIComponent(finalPrompt)}&image=${encodeURIComponent(imageUrl)}`,
+        {
+          timeout: 120000
+        }
+      )
+
+    const data =
+      response.data
+
+    if (
+      !data?.task_id
+    ) {
+
+      console.error(
+        `❌ Edit ${index + 1}: task_id missing`
+      )
+
+      return null
+    }
+
+    const result =
+      await waitForResult(
+        data.task_id
+      )
+
+    return result
+
+  } catch (error) {
+
+    console.error(
+      `❌ Edit ${index + 1} Error:`,
+      error?.response?.status ||
+      error.message
+    )
+
+    return null
+  }
+}
+
+/* =========================================================
+   EDIT SAME IMAGE 4 TIMES
+========================================================= */
+
+async function editSameImageFourTimes(
+  imageUrl,
+  prompt
+) {
+
+  const results = []
+
+  for (
+    let i = 0;
+    i < MAX_IMAGES;
+    i++
+  ) {
+
+    const result =
+      await editOneImage(
+        imageUrl,
+        prompt,
+        i
+      )
+
+    if (result) {
+
+      results.push(result)
+    }
+
+    /*
+     * ما نضربوش API بـ4 طلبات دفعة وحدة
+     */
+
+    if (
+      i < MAX_IMAGES - 1
+    ) {
+
+      await sleep(3000)
+    }
+  }
+
+  return results
+}
+
+/* =========================================================
+   Generate Prompt Variations
+========================================================= */
+
+function getGeneratePrompt(
+  prompt,
+  index
+) {
+
+  const styles = [
+
+    `
+VERSION 1:
+Natural realistic photography.
+Balanced composition.
+Professional camera framing.
+`,
+
+    `
+VERSION 2:
+Different camera angle and framing.
+Cinematic lighting.
+Keep the exact requested subject.
+`,
+
+    `
+VERSION 3:
+Professional portrait composition.
+Different perspective and lighting.
+Keep the requested subject unchanged.
+`,
+
+    `
+VERSION 4:
+Creative professional composition.
+Different framing and visual atmosphere.
+Keep the requested subject exactly as requested.
+`
+  ]
+
+  return `
+USER REQUEST:
+${prompt}
+
+Generate image variation ${index + 1} of 4.
+
+${styles[index]}
+
+Do not change the main subject requested by the user.
+`
+}
+
+/* =========================================================
+   Generate One
+========================================================= */
+
+async function generateOne(
+  prompt,
+  index
+) {
+
+  try {
+
+    const finalPrompt =
+      getGeneratePrompt(
+        prompt,
+        index
+      )
+
+    const response =
+      await getWithRetry(
+        `https://omegatech-api.dixonomega.tech/api/ai/nano-banana-pro?prompt=${encodeURIComponent(finalPrompt)}`,
+        {
+          timeout: 120000
+        }
+      )
+
+    return (
+      response.data?.image ||
+      response.data?.image_url ||
+      response.data?.url ||
+      null
+    )
+
+  } catch (error) {
+
+    console.error(
+      `❌ Generate ${index + 1}:`,
+      error?.response?.status ||
+      error.message
+    )
+
+    return null
+  }
+}
+
+/* =========================================================
+   Generate 4
+========================================================= */
+
+async function generateFour(
+  prompt
+) {
+
+  const results = []
+
+  for (
+    let i = 0;
+    i < MAX_IMAGES;
+    i++
+  ) {
+
+    const result =
+      await generateOne(
+        prompt,
+        i
+      )
+
+    if (result) {
+
+      results.push(result)
+    }
+
+    if (
+      i < MAX_IMAGES - 1
+    ) {
+
+      await sleep(3000)
+    }
+  }
+
+  return results
+}
+
+/* =========================================================
+   Send Results
+========================================================= */
+
+async function sendResults(
+  conn,
+  m,
+  results,
+  prompt,
+  type = 'edit'
+) {
+
+  for (
+    let i = 0;
+    i < results.length;
+    i++
+  ) {
+
+    const caption =
+`╭━━━〔 ${type === 'edit' ? '🎨' : '🍌'} ${BOT_NAME} 〕━━━╮
+┃
+┃ ✅ *النتيجة ${i + 1}/${results.length}*
+┃
+┃ 📝 الوصف:
+┃ ${prompt}
+┃
+┃ 💡 اختار الصورة اللي عجباتك.
+┃
+┃ 👨‍💻 ${DEV_NUMBER}
+┃
+╰━━━━━━━━━━━━━━━━━━╯`
+
+    try {
+
+      await conn.sendMessage(
+        m.chat,
+        {
+          image: {
+            url: results[i]
+          },
+          caption
+        },
+        {
+          quoted: m
+        }
+      )
+
+    } catch (error) {
+
+      console.error(
+        `Send Result ${i + 1}:`,
+        error.message
+      )
+    }
+
+    await sleep(1000)
+  }
+}
+
+/* =========================================================
+   NANO PRO
+========================================================= */
+
+async function nanoProGenerate(
+  images,
+  prompt
+) {
+
+  const results = []
+
+  for (
+    let i = 0;
+    i < MAX_IMAGES;
+    i++
+  ) {
+
+    try {
+
+      const finalPrompt =
+`${prompt}
+
+This is variation ${i + 1} of 4.
+
+Keep all important people and objects from the uploaded reference images.
+Create a different professional composition for each variation.
+Do not remove the requested subjects.`
+
+      let apiUrl =
+        `https://omegatech-api.dixonomega.tech/api/ai/nanobana-pro-v3?prompt=${encodeURIComponent(finalPrompt)}`
+
+      images.forEach(
+        (url, index) => {
+
+          apiUrl +=
+            `&image${index + 1}=${encodeURIComponent(url)}`
+        }
+      )
+
+      const response =
+        await getWithRetry(
+          apiUrl,
+          {
+            timeout: 120000
+          }
+        )
+
+      const data =
+        response.data
+
+      if (
+        !data?.task_id
+      ) {
+
+        continue
+      }
+
+      const result =
+        await waitForResult(
+          data.task_id
+        )
+
+      if (result) {
+
+        results.push(result)
+      }
+
+    } catch (error) {
+
+      console.error(
+        `Nano Pro ${i + 1}:`,
+        error?.response?.status ||
+        error.message
+      )
+    }
+
+    if (
+      i < MAX_IMAGES - 1
+    ) {
+
+      await sleep(3000)
+    }
+  }
+
+  return results
+}
+
+/* =========================================================
+   MAIN HANDLER
+========================================================= */
+
+const handler = async (
+  m,
+  {
+    conn,
+    text,
+    usedPrefix,
+    command
+  }
+) => {
+
+  const userId =
+    m.sender
+
+  text =
+    text ||
+    m.quoted?.text ||
+    m.msg?.caption ||
+    ''
+
+  text =
+    text.trim()
+
+  const cmd =
+    command.toLowerCase()
+
+  /* =======================================================
+     NANO PRO
+  ======================================================= */
+
+  if (
+    cmd === 'nanopro'
+  ) {
+
+    if (
+      !bananaSession[userId]
+    ) {
+
+      bananaSession[userId] = {
+        images: []
+      }
+    }
+
+    /*
+     * DONE
+     */
+
+    if (
+      /^done\b/i.test(text)
+    ) {
+
+      const session =
+        bananaSession[userId]
+
+      const prompt =
+        text
+          .replace(/^done\b/i, '')
+          .trim()
+
+      if (
+        session.images.length < 2
+      ) {
+
+        return conn.reply(
+          m.chat,
+
+`⚠️ *${BOT_NAME}*
+
+خاصك تصيفط على الأقل جوج تصاور.
+
+📸 دابا عندك:
+*${session.images.length}/4*`,
+          m
+        )
+      }
+
+      if (!prompt) {
+
+        return conn.reply(
+          m.chat,
+
+`⚠️ *الوصف ناقص*
+
+مثال:
+
+*${usedPrefix}nanopro done جمع الأشخاص كاملين فصورة وحدة*`,
+          m
+        )
+      }
+
+      await m.react('⏳')
+
+      try {
+
+        const results =
+          await nanoProGenerate(
+            session.images,
+            prompt
+          )
+
+        if (!results.length) {
+
+          throw new Error(
+            'السيرفر ما رجع حتى نتيجة.'
+          )
+        }
+
+        await sendResults(
+          conn,
+          m,
+          results,
+          prompt,
+          'edit'
+        )
 
         await m.react('✅')
 
-
-    } catch (e) {
+      } catch (error) {
 
         console.error(
-            'MENU ERROR:',
-            e
+          'Nano Pro:',
+          error
         )
 
-        try {
+        await m.react('❌')
 
-            await m.react('❌')
+        await conn.reply(
+          m.chat,
 
-        } catch {}
+`❌ *${BOT_NAME}*
 
-        try {
+ما قدرناش نكملو الدمج.
 
-            await m.reply(
-                `❌ وقع خطأ فعرض المنيو.\n\n${e.message || e}`
-            )
+📌 *السبب:*
+${error.message || 'خطأ غير معروف'}
 
-        } catch {}
+🔄 جرب من جديد من بعد شوية.`,
+          m
+        )
+      }
 
+      delete bananaSession[userId]
+
+      return
     }
 
+    /*
+     * Add image
+     */
+
+    if (
+      bananaSession[userId].images.length >= 4
+    ) {
+
+      return conn.reply(
+        m.chat,
+
+`❌ *${BOT_NAME}*
+
+وصلتي للحد الأقصى: *4 تصاور*.`,
+        m
+      )
+    }
+
+    const image =
+      await uploadMedia(m)
+
+    if (!image) {
+
+      return showGuide(
+        m,
+        conn,
+        usedPrefix,
+        command
+      )
+    }
+
+    bananaSession[userId].images.push(
+      image
+    )
+
+    const count =
+      bananaSession[userId].images.length
+
+    await m.react('📥')
+
+    return conn.reply(
+      m.chat,
+
+`╭━━━〔 🍌 ${BOT_NAME} 〕━━━╮
+┃
+┃ ✅ *الصورة تزادت!*
+┃
+┃ 🖼️ *${count}/4*
+┃
+┃ صيفط صورة أخرى
+┃
+┃ أو كتب:
+┃
+┃ *${usedPrefix}nanopro done <الوصف>*
+┃
+╰━━━━━━━━━━━━━━━━━━╯`,
+      m
+    )
+  }
+
+  /* =======================================================
+     NANO
+  ======================================================= */
+
+  if (
+    cmd !== 'nano'
+  ) {
+    return
+  }
+
+  /*
+   * إذا ما كاين لا وصف لا صورة
+   */
+
+  if (
+    !text &&
+    !m.quoted
+  ) {
+
+    return showGuide(
+      m,
+      conn,
+      usedPrefix,
+      command
+    )
+  }
+
+  /*
+   * نشوف واش كاينة صورة
+   */
+
+  const imageUrl =
+    await uploadMedia(m)
+
+  /* =======================================================
+     IMAGE EDIT
+     نفس الصورة -> 4 نتائج
+  ======================================================= */
+
+  if (imageUrl) {
+
+    if (!text) {
+
+      return conn.reply(
+        m.chat,
+
+`⚠️ *${BOT_NAME}*
+
+صيفط وصف التعديل.
+
+مثال:
+
+*${usedPrefix}nano بدل الخلفية وخليها فالطبيعة*
+
+غادي ناخد *نفس الصورة* ونرجع ليك *4 نتائج مختلفة*.`,
+        m
+      )
+    }
+
+    await m.react('⏳')
+
+    try {
+
+      /*
+       * IMPORTANT:
+       * نفس imageUrl كيتستعمل
+       * في الأربع عمليات.
+       */
+
+      const results =
+        await editSameImageFourTimes(
+          imageUrl,
+          text
+        )
+
+      if (!results.length) {
+
+        throw new Error(
+          'السيرفر ما رجع حتى نتيجة. حاول من جديد.'
+        )
+      }
+
+      await sendResults(
+        conn,
+        m,
+        results,
+        text,
+        'edit'
+      )
+
+      await m.react('✅')
+
+    } catch (error) {
+
+      console.error(
+        'Nano Edit Error:',
+        error
+      )
+
+      await m.react('❌')
+
+      let reason =
+        error.message ||
+        'خطأ غير معروف'
+
+      const status =
+        error?.response?.status
+
+      if (
+        status === 503
+      ) {
+
+        reason =
+          'سيرفر توليد الصور مشغول حالياً. الكود حاول إعادة الطلب تلقائياً ولكن السيرفر ما تجاوبش.'
+      }
+
+      await conn.reply(
+        m.chat,
+
+`❌ *${BOT_NAME}*
+
+ما قدرتش نعدل الصورة.
+
+📌 *السبب:*
+${reason}
+
+🔄 جرب من جديد من بعد شوية.`,
+        m
+      )
+    }
+
+    return
+  }
+
+  /* =======================================================
+     TEXT TO IMAGE
+  ======================================================= */
+
+  if (!text) {
+
+    return showGuide(
+      m,
+      conn,
+      usedPrefix,
+      command
+    )
+  }
+
+  await m.react('⏳')
+
+  try {
+
+    const results =
+      await generateFour(
+        text
+      )
+
+    if (!results.length) {
+
+      throw new Error(
+        'السيرفر ما رجع حتى صورة.'
+      )
+    }
+
+    await sendResults(
+      conn,
+      m,
+      results,
+      text,
+      'generate'
+    )
+
+    await m.react('✅')
+
+  } catch (error) {
+
+    console.error(
+      'Nano Generate Error:',
+      error
+    )
+
+    await m.react('❌')
+
+    let reason =
+      error.message ||
+      'خطأ غير معروف'
+
+    const status =
+      error?.response?.status
+
+    if (
+      status === 503
+    ) {
+
+      reason =
+        'سيرفر توليد الصور مشغول حالياً بعد عدة محاولات.'
+    }
+
+    await conn.reply(
+      m.chat,
+
+`❌ *${BOT_NAME}*
+
+ما قدرناش نولد الصور.
+
+📌 *السبب:*
+${reason}
+
+🔄 جرب من جديد.`,
+      m
+    )
+  }
 }
 
-
-// ============================================================
-// معلومات الأمر
-// ============================================================
+/* =========================================================
+   PLUGIN SETTINGS
+========================================================= */
 
 handler.help = [
-    'menu'
+  'nano',
+  'nanopro'
+]
+
+handler.command = [
+  'nano',
+  'nanopro'
 ]
 
 handler.tags = [
-    'main'
+  'editor'
 ]
 
-handler.command =
-    /^(menu|help|\?)$/i
+handler.limit = false
 
 export default handler
