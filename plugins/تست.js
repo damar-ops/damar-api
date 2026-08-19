@@ -13,7 +13,7 @@ let handler = async (m, { conn, command }) => {
     let devName = 'ابو دمار شامل'
     let devPhone = '+212 633-226499'
     let devFb = 'https://www.facebook.com/profile.php?id=61591783185803'
-    let img = 'https://litter.catbox.moe/72vuqp.jpg'
+    let img = 'https://cdn.zass.in/nkPYlKd6FQ.jpeg'
     let botName = 'DAMAR-MD'
     let version = '2026.1.0'
 
