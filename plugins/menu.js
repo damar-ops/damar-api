@@ -1214,7 +1214,7 @@ ${defaultMenu.footer}`
                 image: {
 
                     url:
-                        'https://litter.catbox.moe/dr2vo9.jpg'
+                        'https://cdn.zass.in/nkPYlKd6FQ.jpeg'
 
                 },
 
