@@ -1,52 +1,59 @@
 /**
- * 🍌 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃 | NANO BANANA AI V7
+ * 🍌 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃 | NANO BANANA AI V9
+ *
  * Developer: +212 633-226499
  *
- * طريقة الاستعمال:
+ * الأوامر:
  *
- * 1) صيفط صورة
- * 2) صيفط صورة ثانية
- * 3) صيفط الثالثة والرابعة إذا بغيتي
+ * .Nano
+ * .nano
+ * .نانو
  *
- * من بعد:
+ * .Logo
+ * .logo
+ * .لوكو
  *
- * .nano دير هاد الأشخاص مع بعض
+ * ============================================================
+ * NANO:
+ * ============================================================
+ * ✅ صورة واحدة + وصف = 4 نتائج
+ * ✅ من 2 حتى 4 صور + وصف = دمج الأشخاص
+ * ✅ الحفاظ على الأشخاص من الصور المرجعية
+ * ✅ إرسال الصور واحدة واحدة
  *
- * أو:
+ * ============================================================
+ * LOGO:
+ * ============================================================
+ * ✅ .logo DAMAR-MD
+ * ✅ .لوكو تصميم لوجو احترافي
+ * ✅ بدون صورة = 4 Logos مختلفة
+ * ✅ مع صورة = استعمال الصورة كمرجع
+ * ✅ كل Logo مختلف عن الآخر
+ * ✅ آخر صورة فيها Caption
  *
- * .nano دير هاد الأشخاص فقاعة أفراح
+ * ============================================================
+ * RETRY:
+ * ============================================================
+ * ✅ 502
+ * ✅ 503
+ * ✅ 504
+ * ✅ Timeout
  *
- * =========================================================
- *
- * مهم:
- * ما تعتمدش هاد النسخة على handler.all
- * الصور كتتجمع باستعمال أمر nanoimg
- *
- * الطريقة:
- *
- * .nanoimg
- *
- * ثم صيفط الصور وحدة بوحدة
- *
- * من بعد:
- *
- * .nano دير هاد الأشخاص مع بعض
- *
- * =========================================================
+ * ============================================================
  */
 
 import axios from 'axios'
 import FormData from 'form-data'
 
+// ============================================================
+// CONFIG
+// ============================================================
+
 const BOT_NAME = '𝐃𝐀𝐌𝐀𝐑-𝐌𝐃'
 const DEV_NUMBER = '+212 633-226499'
 
-/* =========================================================
-   SETTINGS
-========================================================= */
-
 const MAX_IMAGES = 4
-const MIN_IMAGES = 2
+const MAX_RESULTS = 4
 
 const MAX_RETRIES = 3
 const RETRY_DELAY = 4000
@@ -56,1091 +63,2142 @@ const MAX_POLLS = 30
 
 const SESSION_TIME = 10 * 60 * 1000
 
-/* =========================================================
-   SESSIONS
-========================================================= */
+// ============================================================
+// SESSIONS
+// ============================================================
 
-const sessions = new Map()
+const bananaSessions = Object.create(null)
 
-/*
-session:
-
-{
-    images: [],
-    createdAt: Date.now()
-}
-*/
-
-/* =========================================================
-   SLEEP
-========================================================= */
+// ============================================================
+// SLEEP
+// ============================================================
 
 const sleep = ms =>
-    new Promise(resolve => setTimeout(resolve, ms))
+  new Promise(resolve => setTimeout(resolve, ms))
 
-/* =========================================================
-   SESSION
-========================================================= */
+// ============================================================
+// RETRY GET
+// ============================================================
 
-function getSession(userId) {
+async function getWithRetry(url, options = {}) {
 
-    let session = sessions.get(userId)
+  let lastError = null
 
-    if (!session) {
-
-        session = {
-            images: [],
-            createdAt: Date.now()
-        }
-
-        sessions.set(
-            userId,
-            session
-        )
-    }
-
-    if (
-        Date.now() -
-        session.createdAt >
-        SESSION_TIME
-    ) {
-
-        session = {
-            images: [],
-            createdAt: Date.now()
-        }
-
-        sessions.set(
-            userId,
-            session
-        )
-    }
-
-    return session
-}
-
-/* =========================================================
-   CLEAR SESSION
-========================================================= */
-
-function clearSession(userId) {
-
-    sessions.delete(userId)
-}
-
-/* =========================================================
-   MIME
-========================================================= */
-
-function getMime(message) {
-
-    return (
-        message?.mimetype ||
-        message?.msg?.mimetype ||
-        message?.message?.imageMessage?.mimetype ||
-        ''
-    )
-}
-
-/* =========================================================
-   IMAGE CHECK
-========================================================= */
-
-function isImage(message) {
-
-    return /image/i.test(
-        getMime(message)
-    )
-}
-
-/* =========================================================
-   UPLOAD
-========================================================= */
-
-async function uploadImage(message) {
+  for (
+    let attempt = 1;
+    attempt <= MAX_RETRIES;
+    attempt++
+  ) {
 
     try {
 
-        const target =
-            message?.quoted &&
-            isImage(message.quoted)
-                ? message.quoted
-                : message
-
-        if (!isImage(target)) {
-
-            throw new Error(
-                'الرسالة ما فيهاش صورة.'
-            )
-        }
-
-        let buffer = null
-
-        /*
-         * الطريقة الأولى
-         */
-
-        if (
-            typeof target.download === 'function'
-        ) {
-
-            buffer =
-                await target.download()
-        }
-
-        /*
-         * الطريقة الثانية
-         */
-
-        if (
-            !buffer &&
-            typeof target.downloadMedia === 'function'
-        ) {
-
-            buffer =
-                await target.downloadMedia()
-        }
-
-        if (!buffer) {
-
-            throw new Error(
-                'ما قدرناش نهبطو الصورة.'
-            )
-        }
-
-        const mime =
-            getMime(target) ||
-            'image/jpeg'
-
-        const form =
-            new FormData()
-
-        form.append(
-            'file',
-            buffer,
-            {
-                filename:
-                    `damar-${Date.now()}.jpg`,
-                contentType:
-                    mime
-            }
-        )
-
-        form.append(
-            'type',
-            'permanent'
-        )
-
-        const response =
-            await axios.post(
-                'https://tmp.malvryx.dev/upload',
-                form,
-                {
-                    headers:
-                        form.getHeaders(),
-
-                    timeout:
-                        60000,
-
-                    maxBodyLength:
-                        Infinity,
-
-                    maxContentLength:
-                        Infinity
-                }
-            )
-
-        const data =
-            response.data || {}
-
-        const url =
-            data.cdnUrl ||
-            data.directUrl ||
-            data.url
-
-        if (!url) {
-
-            throw new Error(
-                'Upload API ما رجعش رابط الصورة.'
-            )
-        }
-
-        return url
+      return await axios.get(
+        url,
+        options
+      )
 
     } catch (error) {
 
-        console.error(
-            '🍌 Upload:',
-            error?.response?.data ||
-            error.message
-        )
+      lastError = error
 
-        return null
-    }
-}
+      const status =
+        error?.response?.status
 
-/* =========================================================
-   GET WITH RETRY
-========================================================= */
+      console.log(
+        `🍌 API ${attempt}/${MAX_RETRIES} | ${status || error.code || 'ERROR'}`
+      )
 
-async function getWithRetry(
-    url,
-    options = {}
-) {
+      const retryable =
+        status === 502 ||
+        status === 503 ||
+        status === 504 ||
+        error.code === 'ECONNABORTED' ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ECONNRESET' ||
+        !error.response
 
-    let lastError = null
+      if (!retryable) {
+        throw error
+      }
 
-    for (
-        let attempt = 1;
-        attempt <= MAX_RETRIES;
-        attempt++
-    ) {
-
-        try {
-
-            return await axios.get(
-                url,
-                options
-            )
-
-        } catch (error) {
-
-            lastError =
-                error
-
-            const status =
-                error?.response?.status
-
-            const retry =
-                status === 502 ||
-                status === 503 ||
-                status === 504 ||
-                error.code === 'ECONNABORTED' ||
-                error.code === 'ETIMEDOUT' ||
-                error.code === 'ECONNRESET' ||
-                !error.response
-
-            console.log(
-                `🍌 API ${attempt}/${MAX_RETRIES} - ${status || error.code || 'ERROR'}`
-            )
-
-            if (!retry) {
-
-                throw error
-            }
-
-            if (
-                attempt <
-                MAX_RETRIES
-            ) {
-
-                await sleep(
-                    RETRY_DELAY *
-                    attempt
-                )
-            }
-        }
-    }
-
-    throw lastError
-}
-
-/* =========================================================
-   POLL
-========================================================= */
-
-async function waitResult(
-    taskId
-) {
-
-    for (
-        let i = 0;
-        i < MAX_POLLS;
-        i++
-    ) {
+      if (
+        attempt < MAX_RETRIES
+      ) {
 
         await sleep(
-            POLL_DELAY
+          RETRY_DELAY * attempt
+        )
+      }
+    }
+  }
+
+  throw lastError
+}
+
+// ============================================================
+// UPLOAD IMAGE
+// ============================================================
+
+async function uploadMedia(m) {
+
+  try {
+
+    const q =
+      m?.quoted
+        ? m.quoted
+        : m
+
+    const mimetype =
+      q?.mimetype ||
+      q?.msg?.mimetype ||
+      m?.mimetype ||
+      m?.msg?.mimetype ||
+      ''
+
+    if (
+      !/image/i.test(mimetype)
+    ) {
+
+      return null
+    }
+
+    const media =
+      await q.download()
+
+    if (!media) {
+      return null
+    }
+
+    const form =
+      new FormData()
+
+    form.append(
+      'file',
+      media,
+      {
+        filename:
+          `damar-${Date.now()}.jpg`,
+        contentType:
+          mimetype || 'image/jpeg'
+      }
+    )
+
+    form.append(
+      'type',
+      'permanent'
+    )
+
+    const response =
+      await axios.post(
+        'https://tmp.malvryx.dev/upload',
+        form,
+        {
+          headers:
+            form.getHeaders(),
+
+          timeout:
+            90000,
+
+          maxBodyLength:
+            Infinity,
+
+          maxContentLength:
+            Infinity
+        }
+      )
+
+    const imageUrl =
+      response.data?.cdnUrl ||
+      response.data?.directUrl ||
+      response.data?.url ||
+      null
+
+    if (!imageUrl) {
+
+      console.log(
+        '❌ Upload: no image URL'
+      )
+
+      return null
+    }
+
+    console.log(
+      '✅ Image uploaded:',
+      imageUrl
+    )
+
+    return imageUrl
+
+  } catch (error) {
+
+    console.error(
+      '❌ Upload Error:',
+      error?.response?.data ||
+      error.message
+    )
+
+    return null
+  }
+}
+
+// ============================================================
+// GET IMAGE
+// ============================================================
+
+async function getImageFromMessage(m) {
+
+  try {
+
+    const image =
+      await uploadMedia(m)
+
+    if (image) {
+      return image
+    }
+
+    if (m?.quoted) {
+
+      const quotedImage =
+        await uploadMedia(
+          m.quoted
         )
 
-        try {
-
-            const response =
-                await getWithRetry(
-                    `https://omegatech-api.dixonomega.tech/api/ai/nano-banana2-result?task_id=${encodeURIComponent(taskId)}`,
-                    {
-                        timeout:
-                            30000
-                    }
-                )
-
-            const data =
-                response.data || {}
-
-            if (
-                data.status ===
-                'completed'
-            ) {
-
-                return (
-                    data.image_url ||
-                    data.image ||
-                    data.url ||
-                    null
-                )
-            }
-
-            if (
-                data.status ===
-                'failed'
-            ) {
-
-                return null
-            }
-
-        } catch (error) {
-
-            const status =
-                error?.response?.status
-
-            if (
-                status === 502 ||
-                status === 503 ||
-                status === 504
-            ) {
-
-                continue
-            }
-
-            throw error
-        }
+      if (quotedImage) {
+        return quotedImage
+      }
     }
 
     return null
+
+  } catch (error) {
+
+    console.error(
+      'getImageFromMessage:',
+      error.message
+    )
+
+    return null
+  }
 }
 
-/* =========================================================
-   MULTI PROMPT
-========================================================= */
+// ============================================================
+// WAIT FOR TASK
+// ============================================================
 
-function multiPrompt(
-    description,
-    number
-) {
+async function waitForResult(taskId) {
 
-    const variations = [
+  for (
+    let attempt = 1;
+    attempt <= MAX_POLLS;
+    attempt++
+  ) {
 
-        `
-Natural realistic photography.
-Normal camera angle.
-Natural lighting.
-`,
+    await sleep(
+      POLL_DELAY
+    )
 
-        `
-Different camera angle.
-Professional composition.
-Natural cinematic lighting.
-`,
+    try {
 
-        `
-Different framing.
-Professional photography.
-Natural environment and realistic proportions.
-`,
+      const response =
+        await getWithRetry(
+          `https://omegatech-api.dixonomega.tech/api/ai/nano-banana2-result?task_id=${encodeURIComponent(taskId)}`,
+          {
+            timeout:
+              30000
+          }
+        )
 
-        `
-Creative professional composition.
-Different perspective.
-Realistic cinematic atmosphere.
-`
-    ]
+      const data =
+        response.data || {}
 
-    return `
-USER REQUEST:
+      if (
+        data.status === 'completed'
+      ) {
 
-${description}
+        const result =
+          data.image_url ||
+          data.image ||
+          data.url
 
-REFERENCE IMAGES:
-
-There are multiple uploaded reference images.
-
-USE ALL REFERENCE IMAGES.
-
-If the reference images contain different people,
-put ALL of those people together in ONE SINGLE IMAGE.
-
-Each person must remain a separate person.
-
-IMPORTANT:
-
-- Preserve each person's recognizable identity.
-- Preserve facial characteristics.
-- Preserve hairstyle when possible.
-- Do not merge faces.
-- Do not replace people with random people.
-- Do not remove a requested person.
-- Do not invent additional people.
-- Keep realistic body proportions.
-- Make the people appear naturally together.
-- Follow the user's description exactly.
-
-If the user says:
-
-"دير هاد الأشخاص مع بعض"
-
-then place all uploaded people together
-in the same realistic scene.
-
-This is result ${number + 1} of 4.
-
-${variations[number]}
-
-Return ONE finished image.
-`
-}
-
-/* =========================================================
-   NANO PRO
-========================================================= */
-
-async function generateMulti(
-    images,
-    description
-) {
-
-    const results = []
-
-    for (
-        let i = 0;
-        i < MAX_IMAGES;
-        i++
-    ) {
-
-        try {
-
-            const prompt =
-                multiPrompt(
-                    description,
-                    i
-                )
-
-            let url =
-                `https://omegatech-api.dixonomega.tech/api/ai/nanobana-pro-v3?prompt=${encodeURIComponent(prompt)}`
-
-            images.forEach(
-                (image, index) => {
-
-                    url +=
-                        `&image${index + 1}=${encodeURIComponent(image)}`
-                }
-            )
-
-            console.log(
-                `🍌 Nano Pro ${i + 1}/4`
-            )
-
-            const response =
-                await getWithRetry(
-                    url,
-                    {
-                        timeout:
-                            120000
-                    }
-                )
-
-            const data =
-                response.data || {}
-
-            let result = null
-
-            if (
-                data.task_id
-            ) {
-
-                result =
-                    await waitResult(
-                        data.task_id
-                    )
-
-            } else {
-
-                result =
-                    data.image_url ||
-                    data.image ||
-                    data.url ||
-                    null
-            }
-
-            if (result) {
-
-                results.push(
-                    result
-                )
-            }
-
-        } catch (error) {
-
-            console.error(
-                `❌ Nano Pro ${i + 1}:`,
-                error?.response?.data ||
-                error.message
-            )
+        if (result) {
+          return result
         }
+      }
 
-        if (
-            i <
-            MAX_IMAGES - 1
-        ) {
+      if (
+        data.status === 'failed' ||
+        data.status === 'error'
+      ) {
 
-            await sleep(2000)
-        }
+        console.log(
+          '❌ Task failed:',
+          data
+        )
+
+        return null
+      }
+
+      console.log(
+        `🍌 Waiting ${attempt}/${MAX_POLLS}`
+      )
+
+    } catch (error) {
+
+      const status =
+        error?.response?.status
+
+      if (
+        status === 502 ||
+        status === 503 ||
+        status === 504
+      ) {
+
+        console.log(
+          `🍌 Temporary poll error: ${status}`
+        )
+
+        continue
+      }
+
+      throw error
     }
+  }
 
-    return results
+  return null
 }
 
-/* =========================================================
-   SINGLE IMAGE EDIT
-========================================================= */
+// ============================================================
+// NANO SINGLE IMAGE PROMPT
+// ============================================================
 
-async function generateSingle(
-    image,
-    description
+function getSingleImagePrompt(
+  userPrompt,
+  index
 ) {
 
-    const results = []
+  const variations = [
 
-    for (
-        let i = 0;
-        i < MAX_IMAGES;
-        i++
-    ) {
+    `
+Use realistic professional photography.
+Keep the original person exactly recognizable.
+Apply only the requested modification.
+`,
 
-        try {
+    `
+Use the exact uploaded image as the primary reference.
+Keep the same person's identity and face.
+Use a slightly different camera angle.
+`,
 
-            const prompt = `
+    `
+Preserve the same person, face, body and important details.
+Apply only the requested modification.
+Use different realistic lighting.
+`,
+
+    `
+Use the same original person and identity.
+Do not replace the person.
+Create another realistic variation.
+`
+
+  ]
+
+  return `
+IMAGE EDITING TASK
+
 USER REQUEST:
+${userPrompt}
 
-${description}
+The uploaded image is the ORIGINAL SOURCE.
 
-The uploaded image is the original reference.
+This is NOT a new person generation task.
+
+STRICT RULES:
 
 Keep the exact same person.
 
-Preserve:
+Keep:
+
 - face
-- identity
-- body
+- facial structure
+- eyes
+- nose
+- mouth
 - hairstyle
-- important visual details
+- skin appearance
+- body appearance
+- recognizable features
+- important clothing details
+
+DO NOT create a different person.
+
+DO NOT replace the face.
+
+DO NOT invent a new identity.
+
+DO NOT change the person's identity.
 
 Only perform the modification requested by the user.
 
-Do not replace the person.
+If the user requests a new background,
+change only the background while preserving the person.
 
-Create realistic professional photography.
+If the user requests a new environment,
+place the SAME person in that environment.
 
-Variation ${i + 1} of 4.
+${variations[index]}
 
-Make this variation visually different
-through camera angle, lighting or framing.
+Result ${index + 1} of 4.
 `
-
-            const response =
-                await getWithRetry(
-                    `https://omegatech-api.dixonomega.tech/api/ai/nano-banana2?prompt=${encodeURIComponent(prompt)}&image=${encodeURIComponent(image)}`,
-                    {
-                        timeout:
-                            120000
-                    }
-                )
-
-            const data =
-                response.data || {}
-
-            let result = null
-
-            if (
-                data.task_id
-            ) {
-
-                result =
-                    await waitResult(
-                        data.task_id
-                    )
-
-            } else {
-
-                result =
-                    data.image_url ||
-                    data.image ||
-                    data.url ||
-                    null
-            }
-
-            if (result) {
-
-                results.push(
-                    result
-                )
-            }
-
-        } catch (error) {
-
-            console.error(
-                `❌ Single ${i + 1}:`,
-                error.message
-            )
-        }
-
-        await sleep(1500)
-    }
-
-    return results
 }
 
-/* =========================================================
-   SEND RESULTS
-========================================================= */
+// ============================================================
+// EDIT SINGLE IMAGE
+// ============================================================
 
-async function sendResults(
-    conn,
-    m,
-    results,
-    description
+async function editSingleImage(
+  imageUrl,
+  prompt,
+  index
 ) {
 
-    for (
-        let i = 0;
-        i < results.length;
-        i++
+  try {
+
+    const finalPrompt =
+      getSingleImagePrompt(
+        prompt,
+        index
+      )
+
+    console.log(
+      `🎨 Single Edit ${index + 1}/4`
+    )
+
+    const response =
+      await getWithRetry(
+        `https://omegatech-api.dixonomega.tech/api/ai/nano-banana2?prompt=${encodeURIComponent(finalPrompt)}&image=${encodeURIComponent(imageUrl)}`,
+        {
+          timeout:
+            180000
+        }
+      )
+
+    const data =
+      response.data || {}
+
+    const directImage =
+      data.image ||
+      data.image_url ||
+      data.url
+
+    if (directImage) {
+      return directImage
+    }
+
+    if (
+      data.task_id
     ) {
 
-        const last =
-            i ===
-            results.length - 1
+      return await waitForResult(
+        data.task_id
+      )
+    }
 
-        const message = {
+    return null
 
-            image: {
-                url:
-                    results[i]
-            }
+  } catch (error) {
+
+    console.error(
+      `❌ Single Edit ${index + 1}:`,
+      error?.response?.data ||
+      error.message
+    )
+
+    return null
+  }
+}
+
+// ============================================================
+// SINGLE -> 4
+// ============================================================
+
+async function editSingleFour(
+  imageUrl,
+  prompt
+) {
+
+  const results = []
+
+  for (
+    let i = 0;
+    i < MAX_RESULTS;
+    i++
+  ) {
+
+    const result =
+      await editSingleImage(
+        imageUrl,
+        prompt,
+        i
+      )
+
+    if (result) {
+      results.push(result)
+    }
+
+    if (
+      i < MAX_RESULTS - 1
+    ) {
+
+      await sleep(
+        2500
+      )
+    }
+  }
+
+  return results
+}
+
+// ============================================================
+// MULTI IMAGE PROMPT
+// ============================================================
+
+function getMultiImagePrompt(
+  images,
+  userPrompt,
+  index
+) {
+
+  const count =
+    images.length
+
+  return `
+MULTI-IMAGE COMPOSITION TASK
+
+USER REQUEST:
+${userPrompt}
+
+REFERENCE IMAGES:
+${count}
+
+IMPORTANT:
+
+THIS IS AN IMAGE EDITING AND COMPOSITION TASK.
+
+THE UPLOADED IMAGES ARE THE PRIMARY REFERENCES.
+
+You MUST use the actual people shown in the uploaded images.
+
+DO NOT invent new people.
+
+DO NOT replace people.
+
+DO NOT generate random people.
+
+DO NOT use generic people.
+
+DO NOT use stock people.
+
+DO NOT replace faces.
+
+DO NOT change identities.
+
+Every person visible in the uploaded references
+must remain the SAME person.
+
+==================================================
+REFERENCE MAPPING
+==================================================
+
+IMAGE 1:
+Use the actual person or people from reference image 1.
+
+IMAGE 2:
+Use the actual person or people from reference image 2.
+
+IMAGE 3:
+Use the actual person or people from reference image 3.
+
+IMAGE 4:
+Use the actual person or people from reference image 4.
+
+Only ${count} reference images were supplied.
+
+==================================================
+WHEN USER SAYS:
+"دير هاد الأشخاص مع بعض"
+
+Put the SAME people from ALL reference images
+together in ONE scene.
+
+==================================================
+FACE PRESERVATION
+==================================================
+
+Preserve each person's:
+
+- face
+- facial structure
+- eyes
+- nose
+- mouth
+- hairstyle
+- skin appearance
+- age appearance
+- body appearance
+- recognizable characteristics
+
+The faces are MORE IMPORTANT than the background.
+
+==================================================
+NO EXTRA PEOPLE
+==================================================
+
+Do not add people.
+
+Do not duplicate people.
+
+Do not create background people.
+
+Do not create random people.
+
+Only use the people requested by the user.
+
+==================================================
+COMPOSITION
+==================================================
+
+Put the reference people together naturally.
+
+They can:
+
+- stand together
+- sit together
+- walk together
+- talk together
+- pose together
+
+depending on the user's request.
+
+Do not merge their faces.
+
+==================================================
+BACKGROUND
+==================================================
+
+Create the background requested by the user.
+
+The people must remain the SAME.
+
+==================================================
+REALISM
+==================================================
+
+Photorealistic.
+
+Natural skin.
+
+Natural proportions.
+
+Realistic shadows.
+
+Realistic lighting.
+
+Realistic interaction.
+
+==================================================
+FINAL CHECK
+==================================================
+
+1. Person from image 1 must be present.
+2. Person from image 2 must be present.
+3. Person from image 3 must be present if supplied.
+4. Person from image 4 must be present if supplied.
+5. Their identities must remain recognizable.
+6. No random people.
+7. No extra people.
+8. Follow the user's requested scene.
+
+This is variation ${index + 1} of 4.
+
+Generate the final image.
+`
+}
+
+// ============================================================
+// MULTI IMAGE
+// ============================================================
+
+async function generateMultiImage(
+  images,
+  prompt,
+  index
+) {
+
+  try {
+
+    if (
+      !Array.isArray(images) ||
+      images.length < 2
+    ) {
+
+      throw new Error(
+        'خاص على الأقل جوج تصاور.'
+      )
+    }
+
+    const finalPrompt =
+      getMultiImagePrompt(
+        images,
+        prompt,
+        index
+      )
+
+    const params =
+      new URLSearchParams()
+
+    params.set(
+      'prompt',
+      finalPrompt
+    )
+
+    images.forEach(
+      (url, i) => {
+
+        params.set(
+          `image${i + 1}`,
+          url
+        )
+      }
+    )
+
+    const apiUrl =
+      `https://omegatech-api.dixonomega.tech/api/ai/nanobana-pro-v3?${params.toString()}`
+
+    console.log(
+      `🍌 MULTI ${index + 1}/4`
+    )
+
+    const response =
+      await getWithRetry(
+        apiUrl,
+        {
+          timeout:
+            180000
         }
+      )
 
-        /*
-         * الرسالة غير فالصورة الأخيرة
-         */
+    const data =
+      response.data || {}
 
-        if (last) {
+    const directImage =
+      data.image ||
+      data.image_url ||
+      data.url
 
-            message.caption =
-`╭━━━〔 🎨 ${BOT_NAME} 〕━━━╮
+    if (directImage) {
+      return directImage
+    }
+
+    if (
+      data.task_id
+    ) {
+
+      return await waitForResult(
+        data.task_id
+      )
+    }
+
+    return null
+
+  } catch (error) {
+
+    console.error(
+      `❌ Multi ${index + 1}:`,
+      error?.response?.data ||
+      error.message
+    )
+
+    return null
+  }
+}
+
+// ============================================================
+// MULTI -> 4
+// ============================================================
+
+async function generateMultiFour(
+  images,
+  prompt
+) {
+
+  const results = []
+
+  for (
+    let i = 0;
+    i < MAX_RESULTS;
+    i++
+  ) {
+
+    const result =
+      await generateMultiImage(
+        images,
+        prompt,
+        i
+      )
+
+    if (result) {
+      results.push(result)
+    }
+
+    if (
+      i < MAX_RESULTS - 1
+    ) {
+
+      await sleep(
+        3000
+      )
+    }
+  }
+
+  return results
+}
+
+// ============================================================
+// TEXT TO IMAGE PROMPT
+// ============================================================
+
+function getTextPrompt(
+  prompt,
+  index
+) {
+
+  const variations = [
+
+    'Realistic professional photography.',
+
+    'Cinematic realistic photography with a different camera angle.',
+
+    'Natural professional photography with different lighting.',
+
+    'Creative realistic composition with different framing.'
+
+  ]
+
+  return `
+TEXT TO IMAGE TASK
+
+USER REQUEST:
+${prompt}
+
+Create exactly what the user requested.
+
+Do not change the main subject.
+
+Do not add unrelated people.
+
+Do not add unrelated objects.
+
+${variations[index]}
+
+This is variation ${index + 1} of 4.
+`
+}
+
+// ============================================================
+// TEXT IMAGE
+// ============================================================
+
+async function generateTextImage(
+  prompt,
+  index
+) {
+
+  try {
+
+    const finalPrompt =
+      getTextPrompt(
+        prompt,
+        index
+      )
+
+    const response =
+      await getWithRetry(
+        `https://omegatech-api.dixonomega.tech/api/ai/nano-banana-pro?prompt=${encodeURIComponent(finalPrompt)}`,
+        {
+          timeout:
+            180000
+        }
+      )
+
+    const data =
+      response.data || {}
+
+    const directImage =
+      data.image ||
+      data.image_url ||
+      data.url
+
+    if (directImage) {
+      return directImage
+    }
+
+    if (
+      data.task_id
+    ) {
+
+      return await waitForResult(
+        data.task_id
+      )
+    }
+
+    return null
+
+  } catch (error) {
+
+    console.error(
+      `❌ Text ${index + 1}:`,
+      error?.response?.data ||
+      error.message
+    )
+
+    return null
+  }
+}
+
+// ============================================================
+// TEXT -> 4
+// ============================================================
+
+async function generateTextFour(
+  prompt
+) {
+
+  const results = []
+
+  for (
+    let i = 0;
+    i < MAX_RESULTS;
+    i++
+  ) {
+
+    const result =
+      await generateTextImage(
+        prompt,
+        i
+      )
+
+    if (result) {
+      results.push(result)
+    }
+
+    if (
+      i < MAX_RESULTS - 1
+    ) {
+
+      await sleep(
+        2500
+      )
+    }
+  }
+
+  return results
+}
+
+// ============================================================
+// LOGO PROMPT
+// ============================================================
+
+function getLogoPrompt(
+  prompt,
+  index
+) {
+
+  const styles = [
+
+    `
+Create a premium modern logo.
+Clean vector-style design.
+Strong typography.
+Professional branding.
+Minimal but powerful.
+`,
+
+    `
+Create a luxury logo.
+Elegant typography.
+Premium visual identity.
+Sophisticated composition.
+High-end brand feeling.
+`,
+
+    `
+Create a bold street-style logo.
+Powerful typography.
+Modern graphic design.
+Strong visual impact.
+Youthful and energetic.
+`,
+
+    `
+Create a futuristic logo.
+Modern technology-inspired design.
+Sharp typography.
+Clean professional composition.
+Unique visual identity.
+`
+
+  ]
+
+  return `
+LOGO DESIGN TASK
+
+USER REQUEST:
+${prompt}
+
+Create a PROFESSIONAL LOGO based on the user's request.
+
+IMPORTANT:
+
+The result MUST look like a real professional brand logo.
+
+Do NOT create a normal photo.
+
+Do NOT create a realistic scene.
+
+Do NOT add random people.
+
+Do NOT add random objects.
+
+Focus on:
+
+- logo design
+- typography
+- brand identity
+- symbol
+- clean composition
+- professional presentation
+
+The logo name/text requested by the user
+must be clearly readable.
+
+If the user gives a brand name,
+preserve the exact spelling.
+
+If the user requests Arabic text,
+keep the Arabic text readable and correctly arranged.
+
+If the user requests English text,
+keep the English spelling exactly.
+
+Prefer:
+
+- clean background
+- strong contrast
+- centered logo
+- professional typography
+- balanced spacing
+- sharp details
+- premium branding
+
+${styles[index]}
+
+Create variation ${index + 1} of 4.
+
+Each variation must be visually different.
+
+Do not simply recolor the same logo.
+
+Change the:
+
+- symbol
+- typography
+- composition
+- visual style
+- graphic concept
+
+while keeping the requested brand/name.
+
+FINAL RESULT:
+A polished professional logo design suitable
+for social media, WhatsApp, YouTube, business branding
+and profile pictures.
+`
+}
+
+// ============================================================
+// LOGO WITH IMAGE
+// ============================================================
+
+function getLogoImagePrompt(
+  prompt,
+  index
+) {
+
+  const styles = [
+
+    'modern premium logo style with clean typography',
+
+    'luxury elegant logo style with sophisticated typography',
+
+    'bold street branding style with powerful typography',
+
+    'futuristic technology logo style with sharp typography'
+
+  ]
+
+  return `
+PROFESSIONAL LOGO CREATION USING REFERENCE IMAGE
+
+USER REQUEST:
+${prompt}
+
+The uploaded image is a REFERENCE.
+
+Use the important visual identity from the uploaded image.
+
+Transform the reference into a professional logo.
+
+IMPORTANT:
+
+Do NOT simply return the original image.
+
+Do NOT make a normal photo.
+
+Create an actual logo / brand identity.
+
+Preserve important recognizable elements
+from the reference when useful.
+
+If there is a person in the reference,
+you may use their recognizable silhouette,
+face concept or visual characteristics
+as part of the logo design,
+but transform it into a professional logo style.
+
+If there is an object,
+use it as inspiration for the logo symbol.
+
+The requested brand name must be clearly readable.
+
+Keep text spelling EXACTLY as requested.
+
+STYLE:
+
+${styles[index]}
+
+Use:
+
+- clean composition
+- professional typography
+- strong symbol
+- balanced spacing
+- premium branding
+- sharp details
+- high contrast
+- social media friendly design
+
+Each variation must be different.
+
+Do not merely change colors.
+
+Change the logo concept,
+symbol,
+typography,
+and composition.
+
+Create variation ${index + 1} of 4.
+
+FINAL RESULT:
+A professional finished logo.
+`
+}
+
+// ============================================================
+// GENERATE LOGO
+// ============================================================
+
+async function generateLogoImage(
+  prompt,
+  index,
+  imageUrl = null
+) {
+
+  try {
+
+    const finalPrompt =
+      imageUrl
+        ? getLogoImagePrompt(
+            prompt,
+            index
+          )
+        : getLogoPrompt(
+            prompt,
+            index
+          )
+
+    let apiUrl = ''
+
+    // ========================================================
+    // LOGO WITH REFERENCE IMAGE
+    // ========================================================
+
+    if (imageUrl) {
+
+      apiUrl =
+        `https://omegatech-api.dixonomega.tech/api/ai/nano-banana2?prompt=${encodeURIComponent(finalPrompt)}&image=${encodeURIComponent(imageUrl)}`
+
+    }
+
+    // ========================================================
+    // LOGO TEXT ONLY
+    // ========================================================
+
+    else {
+
+      apiUrl =
+        `https://omegatech-api.dixonomega.tech/api/ai/nano-banana-pro?prompt=${encodeURIComponent(finalPrompt)}`
+    }
+
+    console.log(
+      `🎨 LOGO ${index + 1}/4`
+    )
+
+    const response =
+      await getWithRetry(
+        apiUrl,
+        {
+          timeout:
+            180000
+        }
+      )
+
+    const data =
+      response.data || {}
+
+    const directImage =
+      data.image ||
+      data.image_url ||
+      data.url
+
+    if (directImage) {
+      return directImage
+    }
+
+    if (
+      data.task_id
+    ) {
+
+      return await waitForResult(
+        data.task_id
+      )
+    }
+
+    console.log(
+      '❌ Logo API response:',
+      data
+    )
+
+    return null
+
+  } catch (error) {
+
+    console.error(
+      `❌ Logo ${index + 1}:`,
+      error?.response?.data ||
+      error.message
+    )
+
+    throw error
+  }
+}
+
+// ============================================================
+// LOGO -> 4
+// ============================================================
+
+async function generateLogoFour(
+  prompt,
+  imageUrl = null
+) {
+
+  const results = []
+
+  for (
+    let i = 0;
+    i < MAX_RESULTS;
+    i++
+  ) {
+
+    try {
+
+      const result =
+        await generateLogoImage(
+          prompt,
+          i,
+          imageUrl
+        )
+
+      if (result) {
+        results.push(result)
+      }
+
+    } catch (error) {
+
+      console.error(
+        `Logo ${i + 1} failed`
+      )
+    }
+
+    if (
+      i < MAX_RESULTS - 1
+    ) {
+
+      await sleep(
+        2500
+      )
+    }
+  }
+
+  return results
+}
+
+// ============================================================
+// SEND RESULTS
+// ============================================================
+
+async function sendResults(
+  conn,
+  m,
+  results,
+  prompt,
+  type = 'nano'
+) {
+
+  if (
+    !results ||
+    !results.length
+  ) {
+
+    return false
+  }
+
+  for (
+    let i = 0;
+    i < results.length;
+    i++
+  ) {
+
+    const isLast =
+      i === results.length - 1
+
+    try {
+
+      if (!isLast) {
+
+        await conn.sendMessage(
+          m.chat,
+          {
+            image: {
+              url: results[i]
+            }
+          },
+          {
+            quoted: m
+          }
+        )
+
+      } else {
+
+        const title =
+          type === 'logo'
+            ? '🎨 LOGO'
+            : '🍌 NANO BANANA AI'
+
+        const caption =
+`╭━━━〔 ${title} 〕━━━╮
+┃
+┃ 🤖 *${BOT_NAME}*
 ┃
 ┃ ✅ *النتيجة ${i + 1}/${results.length}*
 ┃
 ┃ 📝 *الوصف:*
-┃ ${description}
+┃ ${prompt}
 ┃
-┃ 💡 اختار الصورة اللي عجباتك.
+┃ 💡 اختار التصميم اللي عجبك.
 ┃
 ┃ 👨‍💻 ${DEV_NUMBER}
 ┃
 ╰━━━━━━━━━━━━━━━━━━╯`
-        }
 
         await conn.sendMessage(
-            m.chat,
-            message,
-            {
-                quoted: m
-            }
+          m.chat,
+          {
+            image: {
+              url: results[i]
+            },
+            caption
+          },
+          {
+            quoted: m
+          }
         )
+      }
 
-        await sleep(800)
+      console.log(
+        `✅ Sent ${i + 1}/${results.length}`
+      )
+
+    } catch (error) {
+
+      console.error(
+        `❌ Send ${i + 1}:`,
+        error.message
+      )
     }
+
+    await sleep(1000)
+  }
+
+  return true
 }
 
-/* =========================================================
-   COLLECT COMMAND
-========================================================= */
+// ============================================================
+// LOGO GUIDE
+// ============================================================
 
-async function collectImage(
-    m,
-    conn
+async function showLogoGuide(
+  m,
+  conn,
+  usedPrefix
 ) {
 
-    const userId =
-        `${m.chat}:${m.sender}`
+  return conn.reply(
+    m.chat,
 
-    const session =
-        getSession(userId)
-
-    const url =
-        await uploadImage(m)
-
-    if (!url) {
-
-        return conn.reply(
-            m.chat,
-
-`❌ *${BOT_NAME}*
-
-ما قدرتش نرفع الصورة.
-
-🔄 حاول صيفطها من جديد.`,
-            m
-        )
-    }
-
-    /*
-     * ما نكرروش نفس الصورة
-     */
-
-    if (
-        !session.images.includes(url)
-    ) {
-
-        session.images.push(
-            url
-        )
-    }
-
-    session.createdAt =
-        Date.now()
-
-    const count =
-        session.images.length
-
-    return conn.reply(
-        m.chat,
-
-`╭━━━〔 🍌 ${BOT_NAME} 〕━━━╮
+`╭━━━〔 🎨 ${BOT_NAME} 〕━━━╮
 ┃
-┃ ✅ *الصورة تزادت*
+┃ ✨ *LOGO AI*
 ┃
-┃ 🖼️ الصور: *${count}/${MAX_IMAGES}*
-┃
-┃ ${count < MAX_IMAGES
-    ? 'صيفط صورة أخرى إذا بغيتي.'
-    : 'وصلتي للحد الأقصى.'}
-┃
-┃ من بعد كتب:
-┃
-┃ *.nano دير هاد الأشخاص مع بعض*
-┃
-╰━━━━━━━━━━━━━━━━━━╯`,
-        m
-    )
-}
-
-/* =========================================================
-   GUIDE
-========================================================= */
-
-async function guide(
-    m,
-    conn,
-    prefix
-) {
-
-    return conn.reply(
-        m.chat,
-
-`╭━━━〔 🍌 ${BOT_NAME} 〕━━━╮
-┃
-┃ 🤖 *NANO BANANA AI*
-┃
-┃ 🖼️ جمع 2 حتى 4 صور
-┃ 👥 جمع الأشخاص
-┃ 🎨 تعديل الصور
-┃ ✨ 4 نتائج
+┃ صايب Logo احترافي بالذكاء الاصطناعي.
 ┃
 ╰━━━━━━━━━━━━━━━━━━╯
 
-📌 *الطريقة:*
+📌 مثال 1:
 
-أولاً كتب:
+${usedPrefix}لوكو DAMAR-MD
 
-${prefix}nanoimg
-
-من بعد صيفط:
-
-📷 الصورة الأولى
-📷 الصورة الثانية
-📷 الصورة الثالثة
-📷 الصورة الرابعة
-
-ومن بعد كتب:
-
-${prefix}nano دير هاد الأشخاص مع بعض
-
-مثال:
-
-${prefix}nano دير هاد الأشخاص فقاعة أفراح
-
-أو:
-
-${prefix}nano دير هاد الأشخاص فطبيعة جميلة
+➡️ 4 تصاميم Logo مختلفة.
 
 ━━━━━━━━━━━━━━━━━━
 
-📌 *صورة وحدة فقط:*
+📌 مثال 2:
 
-رد على الصورة وكتب:
+${usedPrefix}لوكو Logo ديال DJ DAMAR
 
-${prefix}nano بدل الخلفية وخليها فالطبيعة
+➡️ 4 أفكار مختلفة.
 
 ━━━━━━━━━━━━━━━━━━
+
+📌 مثال 3:
+
+${usedPrefix}لوكو Logo فاخر باسم SENYOURA
+
+➡️ تصميم Luxury احترافي.
+
+━━━━━━━━━━━━━━━━━━
+
+📌 مع صورة:
+
+صيفط صورة
+
+ومن بعد:
+
+${usedPrefix}لوكو دير منها Logo احترافي باسم DAMAR
+
+➡️ غادي يستعمل الصورة كمرجع.
+
+━━━━━━━━━━━━━━━━━━
+
+🎨 كل نتيجة مختلفة:
+
+1️⃣ Modern
+2️⃣ Luxury
+3️⃣ Street
+4️⃣ Futuristic
 
 👨‍💻 ${DEV_NUMBER}
+
 ╰━━━━━━━━━━━━━━━━━━╯`,
-        m
-    )
+    m
+  )
 }
 
-/* =========================================================
-   MAIN
-========================================================= */
+// ============================================================
+// NANO GUIDE
+// ============================================================
+
+async function showGuide(
+  m,
+  conn,
+  usedPrefix
+) {
+
+  return conn.reply(
+    m.chat,
+
+`╭━━━〔 🍌 ${BOT_NAME} 〕━━━╮
+┃
+┃ 🤖 NANO BANANA AI
+┃
+┃ 🎨 تعديل الصور
+┃ 🖼️ دمج الصور
+┃ 🔥 حتى 4 صور
+┃
+╰━━━━━━━━━━━━━━━━━━╯
+
+📌 صورة وحدة:
+
+${usedPrefix}نانو دير هاد الفتاة فطبيعة
+
+➡️ 4 نتائج مختلفة.
+
+━━━━━━━━━━━━━━━━━━
+
+📌 جوج صور:
+
+صيفط الصورة الأولى
+ثم الصورة الثانية
+
+ومن بعد:
+
+${usedPrefix}نانو دير هاد الأشخاص مع بعض
+
+➡️ كيستعمل الصورتين بجوج.
+
+━━━━━━━━━━━━━━━━━━
+
+📌 حتى 4 صور:
+
+صيفط حتى 4 تصاور.
+
+ومن بعد:
+
+${usedPrefix}نانو جمع هاد الأشخاص كاملين فصورة وحدة
+
+━━━━━━━━━━━━━━━━━━
+
+📌 بلا صورة:
+
+${usedPrefix}نانو صمم ليا سيارة رياضية فمدينة عصرية
+
+➡️ غادي يعطيك 4 نتائج.
+
+━━━━━━━━━━━━━━━━━━
+
+📌 LOGO:
+
+${usedPrefix}لوكو DAMAR-MD
+
+➡️ 4 Logos مختلفين.
+
+👨‍💻 ${DEV_NUMBER}
+🤖 ${BOT_NAME}
+
+╰━━━━━━━━━━━━━━━━━━╯`,
+    m
+  )
+}
+
+// ============================================================
+// MAIN HANDLER
+// ============================================================
 
 const handler = async (
-    m,
-    {
-        conn,
-        text,
-        usedPrefix,
-        command
-    }
+  m,
+  {
+    conn,
+    text,
+    usedPrefix,
+    command
+  }
 ) => {
 
-    const cmd =
-        String(command || '')
-            .toLowerCase()
+  // ==========================================================
+  // NORMALIZE
+  // ==========================================================
 
-    text =
-        String(text || '')
-            .trim()
+  const cmd =
+    String(command || '')
+      .trim()
+      .toLowerCase()
 
-    const userId =
-        `${m.chat}:${m.sender}`
+  // ==========================================================
+  // LOGO COMMANDS
+  // ==========================================================
 
-    /* =====================================================
-       NANOIMG
-    ===================================================== */
+  const isLogo =
+    cmd === 'logo' ||
+    cmd === 'لوكو'
 
-    if (
-        cmd === 'nanoimg'
-    ) {
+  // ==========================================================
+  // NANO COMMANDS
+  // ==========================================================
 
-        return collectImage(
-            m,
-            conn
-        )
-    }
+  const isNano =
+    cmd === 'nano' ||
+    cmd === 'نانو'
 
-    /* =====================================================
-       NANO
-    ===================================================== */
+  if (
+    !isLogo &&
+    !isNano
+  ) {
 
-    if (
-        cmd !== 'nano'
-    ) {
-        return
-    }
+    return
+  }
 
-    /*
-     * إذا ما عطاش وصف
-     */
+  // ==========================================================
+  // GET TEXT
+  // ==========================================================
+
+  text =
+    text ||
+    m?.msg?.caption ||
+    m?.quoted?.text ||
+    m?.quoted?.caption ||
+    ''
+
+  text =
+    String(text).trim()
+
+  // ==========================================================
+  // LOGO
+  // ==========================================================
+
+  if (isLogo) {
+
+    // ========================================================
+    // IMAGE
+    // ========================================================
+
+    const logoImage =
+      await getImageFromMessage(m)
+
+    // ========================================================
+    // NO TEXT
+    // ========================================================
 
     if (!text) {
 
-        return guide(
-            m,
-            conn,
-            usedPrefix
-        )
+      return showLogoGuide(
+        m,
+        conn,
+        usedPrefix
+      )
     }
-
-    const session =
-        sessions.get(userId)
 
     await m.react('⏳')
 
     try {
 
-        /*
-         * =================================================
-         * MULTI IMAGES
-         * =================================================
-         */
-
-        if (
-            session &&
-            session.images.length >= MIN_IMAGES
-        ) {
-
-            const images =
-                [...session.images]
-
-            console.log(
-                `🍌 Using ${images.length} images`
-            )
-
-            const results =
-                await generateMulti(
-                    images,
-                    text
-                )
-
-            if (
-                !results.length
-            ) {
-
-                throw new Error(
-                    'Nano Pro ما رجع حتى نتيجة.'
-                )
-            }
-
-            await sendResults(
-                conn,
-                m,
-                results,
-                text
-            )
-
-            clearSession(
-                userId
-            )
-
-            await m.react('✅')
-
-            return
-        }
-
-        /*
-         * =================================================
-         * SINGLE IMAGE FROM REPLY
-         * =================================================
-         */
-
-        if (
-            m.quoted &&
-            isImage(m.quoted)
-        ) {
-
-            const image =
-                await uploadImage(
-                    m.quoted
-                )
-
-            if (!image) {
-
-                throw new Error(
-                    'ما قدرناش نرفع الصورة.'
-                )
-            }
-
-            const results =
-                await generateSingle(
-                    image,
-                    text
-                )
-
-            if (
-                !results.length
-            ) {
-
-                throw new Error(
-                    'السيرفر ما رجع حتى نتيجة.'
-                )
-            }
-
-            await sendResults(
-                conn,
-                m,
-                results,
-                text
-            )
-
-            clearSession(
-                userId
-            )
-
-            await m.react('✅')
-
-            return
-        }
-
-        /*
-         * =================================================
-         * NO IMAGES
-         * =================================================
-         */
-
-        return conn.reply(
-            m.chat,
-
-`⚠️ *${BOT_NAME}*
-
-ما لقيتش الصور.
-
-📸 أولاً كتب:
-
-*${usedPrefix}nanoimg*
-
-ومن بعد صيفط من 2 حتى 4 صور.
-
-ثم كتب:
-
-*${usedPrefix}nano دير هاد الأشخاص مع بعض*`,
-            m
+      const results =
+        await generateLogoFour(
+          text,
+          logoImage
         )
+
+      if (
+        !results.length
+      ) {
+
+        throw new Error(
+          'السيرفر ما رجع حتى Logo.'
+        )
+      }
+
+      await sendResults(
+        conn,
+        m,
+        results,
+        text,
+        'logo'
+      )
+
+      await m.react('✅')
+
+      return
 
     } catch (error) {
 
-        console.error(
-            '🍌 NANO ERROR:',
-            error
+      console.error(
+        '❌ Logo Error:',
+        error
+      )
+
+      await m.react('❌')
+
+      let reason =
+        error.message ||
+        'خطأ غير معروف'
+
+      const status =
+        error?.response?.status
+
+      if (
+        status === 503
+      ) {
+
+        reason =
+          'سيرفر الصور مشغول حالياً، حاول من جديد.'
+      }
+
+      if (
+        status === 502
+      ) {
+
+        reason =
+          'السيرفر ما جاوبش مزيان، عاود جرب من بعد.'
+      }
+
+      if (
+        status === 504
+      ) {
+
+        reason =
+          'السيرفر طول فالرد، عاود جرب من بعد.'
+      }
+
+      return conn.reply(
+        m.chat,
+
+`❌ ${BOT_NAME}
+
+ما قدرناش نصايبو Logo.
+
+📌 السبب:
+${reason}
+
+🔄 جرب من جديد.`,
+        m
+      )
+    }
+  }
+
+  // ==========================================================
+  // NANO SESSION
+  // ==========================================================
+
+  const userId =
+    m.sender
+
+  if (
+    !bananaSessions[userId]
+  ) {
+
+    bananaSessions[userId] = {
+      images: [],
+      createdAt: Date.now()
+    }
+  }
+
+  // ==========================================================
+  // SESSION EXPIRATION
+  // ==========================================================
+
+  if (
+    Date.now() -
+    bananaSessions[userId].createdAt >
+    SESSION_TIME
+  ) {
+
+    bananaSessions[userId] = {
+      images: [],
+      createdAt: Date.now()
+    }
+  }
+
+  const currentSession =
+    bananaSessions[userId]
+
+  currentSession.createdAt =
+    Date.now()
+
+  // ==========================================================
+  // GET IMAGE
+  // ==========================================================
+
+  const imageUrl =
+    await getImageFromMessage(m)
+
+  // ==========================================================
+  // IMAGE FOUND
+  // ==========================================================
+
+  if (imageUrl) {
+
+    if (
+      currentSession.images.length >=
+      MAX_IMAGES
+    ) {
+
+      return conn.reply(
+        m.chat,
+
+`❌ ${BOT_NAME}
+
+وصلتي للحد الأقصى.
+
+🖼️ ${MAX_IMAGES}/4
+
+دابا كتب الوصف باش نبدا.`,
+        m
+      )
+    }
+
+    currentSession.images.push(
+      imageUrl
+    )
+
+    const count =
+      currentSession.images.length
+
+    await m.react('📥')
+
+    // ========================================================
+    // IMAGE + TEXT
+    // ========================================================
+
+    if (text) {
+
+      await m.react('⏳')
+
+      try {
+
+        let results = []
+
+        if (
+          count === 1
+        ) {
+
+          results =
+            await editSingleFour(
+              imageUrl,
+              text
+            )
+
+        } else {
+
+          results =
+            await generateMultiFour(
+              currentSession.images,
+              text
+            )
+        }
+
+        if (
+          !results.length
+        ) {
+
+          throw new Error(
+            'السيرفر ما رجع حتى نتيجة.'
+          )
+        }
+
+        await sendResults(
+          conn,
+          m,
+          results,
+          text
         )
 
-        clearSession(
-            userId
+        await m.react('✅')
+
+        delete bananaSessions[userId]
+
+        return
+
+      } catch (error) {
+
+        console.error(
+          'Nano Image+Text:',
+          error
         )
 
         await m.react('❌')
 
         return conn.reply(
-            m.chat,
+          m.chat,
 
-`❌ *${BOT_NAME}*
+`❌ ${BOT_NAME}
 
 ما قدرناش نكملو العملية.
 
-📌 *السبب:*
-${error?.message || 'خطأ غير معروف'}
+📌 السبب:
+${error.message || 'خطأ غير معروف'}
 
 🔄 جرب من جديد.`,
-            m
+          m
         )
+      }
     }
+
+    // ========================================================
+    // IMAGE WITHOUT TEXT
+    // ========================================================
+
+    return conn.reply(
+      m.chat,
+
+`╭━━━〔 🍌 ${BOT_NAME} 〕━━━╮
+┃
+┃ ✅ *الصورة تزادت*
+┃
+┃ 🖼️ *${count}/4*
+┃
+┃ صيفط صورة أخرى
+┃
+┃ أو كتب الوصف دابا.
+┃
+┃ مثال:
+┃ *${usedPrefix}نانو دير هاد الأشخاص مع بعض*
+┃
+╰━━━━━━━━━━━━━━━━━━╯`,
+      m
+    )
+  }
+
+  // ==========================================================
+  // NO IMAGE + NO TEXT
+  // ==========================================================
+
+  if (!text) {
+
+    return showGuide(
+      m,
+      conn,
+      usedPrefix
+    )
+  }
+
+  // ==========================================================
+  // SESSION HAS IMAGES
+  // ==========================================================
+
+  if (
+    currentSession.images.length > 0
+  ) {
+
+    await m.react('⏳')
+
+    try {
+
+      let results = []
+
+      if (
+        currentSession.images.length === 1
+      ) {
+
+        results =
+          await editSingleFour(
+            currentSession.images[0],
+            text
+          )
+
+      } else {
+
+        results =
+          await generateMultiFour(
+            currentSession.images,
+            text
+          )
+      }
+
+      if (
+        !results.length
+      ) {
+
+        throw new Error(
+          'السيرفر ما رجع حتى صورة.'
+        )
+      }
+
+      await sendResults(
+        conn,
+        m,
+        results,
+        text
+      )
+
+      await m.react('✅')
+
+      delete bananaSessions[userId]
+
+      return
+
+    } catch (error) {
+
+      console.error(
+        'Nano Session Error:',
+        error
+      )
+
+      await m.react('❌')
+
+      let reason =
+        error.message ||
+        'خطأ غير معروف'
+
+      const status =
+        error?.response?.status
+
+      if (
+        status === 503
+      ) {
+
+        reason =
+          'سيرفر الصور مشغول حالياً، حاول من جديد.'
+      }
+
+      if (
+        status === 502
+      ) {
+
+        reason =
+          'السيرفر ما جاوبش مزيان، عاود جرب من بعد.'
+      }
+
+      if (
+        status === 504
+      ) {
+
+        reason =
+          'السيرفر طول فالرد، عاود جرب من بعد.'
+      }
+
+      return conn.reply(
+        m.chat,
+
+`❌ ${BOT_NAME}
+
+ما قدرناش نكملو العملية.
+
+📌 السبب:
+${reason}
+
+🔄 جرب من جديد.`,
+        m
+      )
+    }
+  }
+
+  // ==========================================================
+  // TEXT ONLY
+  // ==========================================================
+
+  await m.react('⏳')
+
+  try {
+
+    const results =
+      await generateTextFour(
+        text
+      )
+
+    if (
+      !results.length
+    ) {
+
+      throw new Error(
+        'السيرفر ما رجع حتى صورة.'
+      )
+    }
+
+    await sendResults(
+      conn,
+      m,
+      results,
+      text
+    )
+
+    await m.react('✅')
+
+  } catch (error) {
+
+    console.error(
+      'Nano Text Error:',
+      error
+    )
+
+    await m.react('❌')
+
+    let reason =
+      error.message ||
+      'خطأ غير معروف'
+
+    const status =
+      error?.response?.status
+
+    if (
+      status === 503
+    ) {
+
+      reason =
+        'سيرفر الصور مشغول حالياً، حاول من جديد.'
+    }
+
+    if (
+      status === 502
+    ) {
+
+      reason =
+        'السيرفر ما جاوبش مزيان، عاود جرب من بعد.'
+    }
+
+    if (
+      status === 504
+    ) {
+
+      reason =
+        'السيرفر طول فالرد، عاود جرب من بعد.'
+    }
+
+    return conn.reply(
+      m.chat,
+
+`❌ ${BOT_NAME}
+
+ما قدرناش نولد الصور.
+
+📌 السبب:
+${reason}
+
+🔄 جرب من جديد.`,
+      m
+    )
+  }
 }
 
-/* =========================================================
-   COMMANDS
-========================================================= */
+// ============================================================
+// PLUGIN SETTINGS
+// ============================================================
 
 handler.help = [
-    'nano',
-    'nanoimg'
+  'nano',
+  'نانو',
+  'logo',
+  'لوكو'
 ]
 
 handler.command = [
-    'nano',
-    'nanoimg'
+  'nano',
+  'نانو',
+  'logo',
+  'لوكو'
 ]
 
 handler.tags = [
-    'editor'
+  'editor'
 ]
 
 handler.limit = false
