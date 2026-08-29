@@ -4,10 +4,9 @@
  * Bot: 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃
  * Developer: أبو دمار شامل
  *
- * الخدمة:
- * 📷 أي صورة → 🎨 رسم بالقلم الرصاص
+ * 📷 الصور فقط → ✏️ رسم بالقلم
  *
- * التحكم:
+ * .رسوم
  * .رسوم اون
  * .رسوم اوف
  */
@@ -29,7 +28,7 @@ const DEVELOPER_FACEBOOK =
 
 
 // ============================================================
-// الحالة
+// حالة الرسم التلقائي
 // ============================================================
 
 if (typeof global.damarDrawEnabled === 'undefined') {
@@ -38,7 +37,7 @@ if (typeof global.damarDrawEnabled === 'undefined') {
 
 
 // ============================================================
-// جلسات الصور
+// جلسات تغيير الرسم
 // ============================================================
 
 global.damarDrawSessions =
@@ -46,7 +45,7 @@ global.damarDrawSessions =
 
 
 // ============================================================
-// معرفة النص
+// استخراج النص
 // ============================================================
 
 function getText(m) {
@@ -63,7 +62,7 @@ function getText(m) {
 
 
 // ============================================================
-// معرفة MIME
+// استخراج MIME
 // ============================================================
 
 function getMime(m) {
@@ -80,50 +79,125 @@ function getMime(m) {
 
 
 // ============================================================
-// واش الميساج فيه صورة
+// التأكد أنها صورة حقيقية
+// ============================================================
+//
+// مهم:
+// image/webp = غالباً Sticker
+// لذلك ممنوع يدخل للرسم.
+//
+// المسموح:
+// image/jpeg
+// image/jpg
+// image/png
+// image/heic
+// image/heif
+//
 // ============================================================
 
-function isImageMessage(m) {
+function isRealPhoto(m) {
 
-    const mime = getMime(m)
-
-    if (mime.startsWith('image/')) {
-        return true
+    if (!m) {
+        return false
     }
 
-    if (m?.message?.imageMessage) {
-        return true
-    }
+
+    // --------------------------------------------------------
+    // Sticker = ممنوع
+    // --------------------------------------------------------
+
+    const mime =
+        getMime(m)
 
     if (
-        m?.message?.viewOnceMessage?.message
+        mime === 'image/webp' ||
+        mime === 'image/x-webp'
+    ) {
+        return false
+    }
+
+
+    // --------------------------------------------------------
+    // صورة Baileys مباشرة
+    // --------------------------------------------------------
+
+    if (
+        m?.message?.imageMessage
+    ) {
+        return true
+    }
+
+
+    // --------------------------------------------------------
+    // View Once
+    // --------------------------------------------------------
+
+    if (
+        m?.message
+            ?.viewOnceMessage
+            ?.message
             ?.imageMessage
     ) {
         return true
     }
 
+
+    // --------------------------------------------------------
+    // View Once V2
+    // --------------------------------------------------------
+
     if (
-        m?.message?.viewOnceMessageV2?.message
+        m?.message
+            ?.viewOnceMessageV2
+            ?.message
             ?.imageMessage
     ) {
         return true
     }
+
+
+    // --------------------------------------------------------
+    // Gaff / Baileys normalized message
+    // --------------------------------------------------------
+
+    if (
+        m?.mtype === 'imageMessage'
+    ) {
+        return true
+    }
+
+
+    // --------------------------------------------------------
+    // MIME فقط للصور الحقيقية
+    // --------------------------------------------------------
+
+    if (
+        mime === 'image/jpeg' ||
+        mime === 'image/jpg' ||
+        mime === 'image/png' ||
+        mime === 'image/heic' ||
+        mime === 'image/heif'
+    ) {
+        return true
+    }
+
 
     return false
 }
 
 
 // ============================================================
-// واش الصورة ديال البوت نفسه
+// التحقق من صورة البوت
 // ============================================================
 //
-// مهم جداً باش ما يدخلش البوت فحلقة:
-// البوت يصيفط صورة → يلقاها → يحولها → يصيفط صورة → ...
+// باش ما يدخلش فحلقة:
+// البوت يرسل صورة → البوت يعالجها مرة أخرى
 //
 
 function isBotGeneratedImage(m) {
 
-    const text = getText(m)
+    const text =
+        getText(m)
 
     if (!text) {
         return false
@@ -131,7 +205,9 @@ function isBotGeneratedImage(m) {
 
     return (
         text.includes(BOT_NAME) &&
-        text.includes('تم تحويل الصورة إلى رسم')
+        text.includes(
+            'تم تحويل الصورة إلى رسم'
+        )
     )
 }
 
@@ -144,11 +220,17 @@ async function uploadImage(m) {
 
     try {
 
-        let target = m
+        let target =
+            m
+
 
         // --------------------------------------------------------
-        // إذا كان المستخدم دار Reply على صورة
+        // إذا كان Reply على صورة
         // --------------------------------------------------------
+        //
+        // هذا غير مفيد للـAUTO.
+        // لكن خليه موجود باش يبقى الكود متوافق.
+        //
 
         if (m?.quoted) {
 
@@ -156,18 +238,26 @@ async function uploadImage(m) {
                 getMime(m.quoted)
 
             if (
-                quotedMime.startsWith('image/')
+                quotedMime === 'image/jpeg' ||
+                quotedMime === 'image/jpg' ||
+                quotedMime === 'image/png' ||
+                quotedMime === 'image/heic' ||
+                quotedMime === 'image/heif'
             ) {
-                target = m.quoted
+
+                target =
+                    m.quoted
             }
         }
 
 
         // --------------------------------------------------------
-        // نتأكد أنها صورة
+        // لازم تكون صورة حقيقية
         // --------------------------------------------------------
 
-        if (!isImageMessage(target)) {
+        if (
+            !isRealPhoto(target)
+        ) {
             return null
         }
 
@@ -179,6 +269,7 @@ async function uploadImage(m) {
         const buffer =
             await target.download()
 
+
         if (!buffer) {
             return null
         }
@@ -188,9 +279,17 @@ async function uploadImage(m) {
         // MIME
         // --------------------------------------------------------
 
-        const mime =
-            getMime(target) ||
-            'image/jpeg'
+        let mime =
+            getMime(target)
+
+
+        if (
+            !mime ||
+            mime === 'image/webp'
+        ) {
+            mime =
+                'image/jpeg'
+        }
 
 
         // --------------------------------------------------------
@@ -200,14 +299,19 @@ async function uploadImage(m) {
         const form =
             new FormData()
 
+
         form.append(
             'file',
             buffer,
             {
-                filename: 'damar-draw.jpg',
-                contentType: mime
+                filename:
+                    'damar-draw.jpg',
+
+                contentType:
+                    mime
             }
         )
+
 
         form.append(
             'type',
@@ -262,49 +366,56 @@ async function uploadImage(m) {
 // إنشاء الرسم
 // ============================================================
 
-async function generateDrawing(imageUrl) {
+async function generateDrawing(
+    imageUrl
+) {
 
     const prompt = `
-Transform this image into a highly detailed realistic graphite pencil drawing.
+Transform the provided photograph into a highly detailed realistic graphite pencil drawing.
 
 IMPORTANT:
-Keep the same person, face, identity, pose, hairstyle and composition.
+Keep exactly the same person, face, identity, hairstyle, pose and composition.
 
-The result must look like a real artist manually drew the original photograph.
+The result must look like a real artist manually drew the original photograph on white paper.
 
 STYLE:
-realistic pencil sketch
-graphite pencil
-white paper
+realistic graphite pencil drawing
+professional hand drawn portrait
 fine pencil lines
-detailed face
+detailed facial features
 realistic eyes
 realistic eyebrows
 realistic lips
 detailed hair strokes
 soft graphite shading
 cross hatching
-professional hand drawing
 natural shadows
+white paper
 high detail
+realistic sketch
 
 DO NOT:
 change the person's identity
 change the face
+change the pose
 add another person
 remove the person
 add text
 add watermark
 add logo
-add decorations
 add frame
-use anime style
-use cartoon style
-use 3D style
+add decorations
+use anime
+use cartoon
+use 3D
 use colorful painting
+use digital painting
 
-Keep the original composition and make it look like a real pencil portrait drawn on paper.
+Keep the original composition.
+
+Make the final result look like a real pencil drawing made by a professional artist.
 `
+
 
     const apiUrl =
         'https://omegatech-api.dixonomega.tech/api/ai/nano-banana2' +
@@ -313,14 +424,15 @@ Keep the original composition and make it look like a real pencil portrait drawn
 
 
     // --------------------------------------------------------
-    // بدء المهمة
+    // Start
     // --------------------------------------------------------
 
     const start =
         await axios.get(
             apiUrl,
             {
-                timeout: 30000
+                timeout:
+                    30000
             }
         )
 
@@ -332,7 +444,7 @@ Keep the original composition and make it look like a real pencil portrait drawn
     if (!taskId) {
 
         console.error(
-            '[DAMAR DRAW API]',
+            '[DAMAR DRAW API START]',
             start.data
         )
 
@@ -346,7 +458,8 @@ Keep the original composition and make it look like a real pencil portrait drawn
     // انتظار النتيجة
     // --------------------------------------------------------
     //
-    // 20 × 3 ثواني = تقريباً دقيقة
+    // 20 × 3 ثواني
+    // حوالي دقيقة كحد أقصى
     //
 
     for (
@@ -366,19 +479,24 @@ Keep the original composition and make it look like a real pencil portrait drawn
 
         try {
 
-            const result =
+            const response =
                 await axios.get(
                     'https://omegatech-api.dixonomega.tech/api/ai/nano-banana2-result' +
                     `?task_id=${encodeURIComponent(taskId)}`,
                     {
-                        timeout: 15000
+                        timeout:
+                            15000
                     }
                 )
 
 
             const data =
-                result.data
+                response.data
 
+
+            // --------------------------------------------------
+            // نجح
+            // --------------------------------------------------
 
             if (
                 data?.status === 'completed' &&
@@ -389,12 +507,16 @@ Keep the original composition and make it look like a real pencil portrait drawn
             }
 
 
+            // --------------------------------------------------
+            // فشل
+            // --------------------------------------------------
+
             if (
                 data?.status === 'failed'
             ) {
 
                 throw new Error(
-                    'السيرفر فشل فصناعة الرسم'
+                    'generation_failed'
                 )
             }
 
@@ -402,10 +524,12 @@ Keep the original composition and make it look like a real pencil portrait drawn
 
             if (
                 error?.message ===
-                'السيرفر فشل فصناعة الرسم'
+                'generation_failed'
             ) {
+
                 throw error
             }
+
 
             console.log(
                 '[DAMAR DRAW CHECK]',
@@ -416,20 +540,20 @@ Keep the original composition and make it look like a real pencil portrait drawn
 
 
     throw new Error(
-        'انتهت مدة الانتظار بدون نتيجة'
+        'generation_timeout'
     )
 }
 
 
 // ============================================================
-// إرسال الرسم
+// إرسال النتيجة
 // ============================================================
 
 async function sendDrawing(
     m,
     conn,
     imageUrl,
-    originalSender
+    sender
 ) {
 
     try {
@@ -445,14 +569,15 @@ async function sendDrawing(
 
 
         if (!resultUrl) {
+
             throw new Error(
-                'ما توصلناش بالصورة الناتجة'
+                'No result image'
             )
         }
 
 
         // --------------------------------------------------------
-        // Session ID
+        // Session
         // --------------------------------------------------------
 
         const sessionId =
@@ -469,7 +594,7 @@ async function sendDrawing(
                     imageUrl,
 
                 sender:
-                    originalSender,
+                    sender,
 
                 created:
                     Date.now()
@@ -502,15 +627,17 @@ async function sendDrawing(
             {
 
                 image: {
-                    url: resultUrl
+                    url:
+                        resultUrl
                 },
+
 
                 caption:
 `╭━━━⪩ 🎨 ${BOT_NAME} ⪨━━━⬣
 ┃
 ┃ ✏️ تم تحويل الصورة إلى رسم
 ┃ 🖼️ رسم بالقلم الرصاص
-┃ ⚡ DAMAR-MD AUTO DRAW
+┃ ⚡ AUTO DRAW
 ┃
 ┃ 👑 المطور: ${DEVELOPER}
 ┃
@@ -519,11 +646,12 @@ async function sendDrawing(
                 footer:
                     `${BOT_NAME} • ${DEVELOPER}`,
 
+
                 buttons: [
 
-                    // ------------------------------------------------
+                    // ==================================================
                     // تغيير الرسم
-                    // ------------------------------------------------
+                    // ==================================================
 
                     {
                         name:
@@ -542,9 +670,9 @@ async function sendDrawing(
                     },
 
 
-                    // ------------------------------------------------
+                    // ==================================================
                     // حساب المطور
-                    // ------------------------------------------------
+                    // ==================================================
 
                     {
                         name:
@@ -573,13 +701,12 @@ async function sendDrawing(
 
 
         // --------------------------------------------------------
-        // نجاح
+        // Success
         // --------------------------------------------------------
 
         try {
             await m.react('✅')
         } catch {}
-
 
     } catch (error) {
 
@@ -598,7 +725,8 @@ async function sendDrawing(
 
             await conn.reply(
                 m.chat,
-                `❌ *${BOT_NAME}*
+
+`❌ ${BOT_NAME}
 
 ما قدرتش نصايب الرسم دابا.
 
@@ -612,46 +740,59 @@ async function sendDrawing(
 
 
 // ============================================================
-// استخراج ID ديال الزر
+// استخراج ID ديال الأزرار
 // ============================================================
 
 function getButtonId(m) {
 
     try {
 
-        // Buttons response
+        // --------------------------------------------------------
+        // Buttons
+        // --------------------------------------------------------
+
         const button =
             m?.message
                 ?.buttonsResponseMessage
                 ?.selectedButtonId
+
 
         if (button) {
             return button
         }
 
 
-        // Template button
+        // --------------------------------------------------------
+        // Template
+        // --------------------------------------------------------
+
         const template =
             m?.message
                 ?.templateButtonReplyMessage
                 ?.selectedId
+
 
         if (template) {
             return template
         }
 
 
+        // --------------------------------------------------------
         // Interactive
+        // --------------------------------------------------------
+
         const params =
             m?.message
                 ?.interactiveResponseMessage
                 ?.nativeFlowResponseMessage
                 ?.paramsJson
 
+
         if (params) {
 
             const data =
                 JSON.parse(params)
+
 
             return (
                 data?.id ||
@@ -674,7 +815,7 @@ function getButtonId(m) {
 
 
 // ============================================================
-// الأمر ON / OFF
+// Handler ديال الأوامر
 // ============================================================
 
 const handler = async (
@@ -692,7 +833,49 @@ const handler = async (
 
 
         // ======================================================
-        // تشغيل
+        // .رسوم فقط
+        // ======================================================
+
+        if (
+            /^(?:[.!/])?رسوم$/iu
+                .test(text)
+        ) {
+
+            const status =
+                global.damarDrawEnabled === true
+                    ? '🟢 ON'
+                    : '🔴 OFF'
+
+
+            return conn.reply(
+                m.chat,
+
+`╭━━━⪩ 🎨 ${BOT_NAME} ⪨━━━⬣
+┃
+┃ ✏️ الرسم التلقائي
+┃ الحالة: ${status}
+┃
+┃ 📷 كيفاش تخدم؟
+┃ صيفط أي صورة فقط
+┃ وغادي تتحول تلقائياً لرسم بالقلم ✏️
+┃
+┃ 🟢 تشغيل:
+┃ .رسوم اون
+┃
+┃ 🔴 إيقاف:
+┃ .رسوم اوف
+┃
+┃ 👑 المطور:
+┃ ${DEVELOPER}
+┃
+╰━━━━━━━━━━━━━━⬣`,
+                m
+            )
+        }
+
+
+        // ======================================================
+        // .رسوم اون
         // ======================================================
 
         if (
@@ -705,7 +888,7 @@ const handler = async (
                 return conn.reply(
                     m.chat,
 
-`❌ غير صاحب البوت يقدر يتحكم فـ Auto Draw.
+`❌ هاد الأمر خاص بصاحب البوت فقط.
 
 👑 ${DEVELOPER}`,
                     m
@@ -729,7 +912,7 @@ const handler = async (
 ┃
 ┃ 🟢 الرسم التلقائي: ON
 ┃
-┃ 📷 أي واحد يصيفط صورة
+┃ 📷 أي صورة حقيقية
 ┃ ✏️ غادي تتحول تلقائياً لرسم
 ┃
 ┃ 👑 المطور: ${DEVELOPER}
@@ -741,7 +924,7 @@ const handler = async (
 
 
         // ======================================================
-        // إيقاف
+        // .رسوم اوف
         // ======================================================
 
         if (
@@ -754,7 +937,7 @@ const handler = async (
                 return conn.reply(
                     m.chat,
 
-`❌ غير صاحب البوت يقدر يتحكم فـ Auto Draw.
+`❌ هاد الأمر خاص بصاحب البوت فقط.
 
 👑 ${DEVELOPER}`,
                     m
@@ -778,7 +961,7 @@ const handler = async (
 ┃
 ┃ 🔴 الرسم التلقائي: OFF
 ┃
-┃ باش تشغلو:
+┃ باش ترجع تشغلو:
 ┃ .رسوم اون
 ┃
 ╰━━━━━━━━━━━━━━⬣`,
@@ -809,7 +992,7 @@ handler.all = async function (m) {
 
 
         // ======================================================
-        // الخدمة OFF
+        // OFF
         // ======================================================
 
         if (
@@ -820,7 +1003,7 @@ handler.all = async function (m) {
 
 
         // ======================================================
-        // ما نعالجوش رسائل Baileys الداخلية
+        // تجاهل رسائل النظام
         // ======================================================
 
         if (
@@ -831,7 +1014,7 @@ handler.all = async function (m) {
 
 
         // ======================================================
-        // ما نعالجوش صور البوت الناتجة
+        // تجاهل الصور الناتجة ديال البوت
         // ======================================================
 
         if (
@@ -885,7 +1068,7 @@ handler.all = async function (m) {
 
 
             // --------------------------------------------------
-            // غير صاحب الصورة يستعمل الزر
+            // غير صاحب الصورة
             // --------------------------------------------------
 
             if (
@@ -901,18 +1084,10 @@ handler.all = async function (m) {
             }
 
 
-            // --------------------------------------------------
-            // React
-            // --------------------------------------------------
-
             try {
                 await m.react('⌛')
             } catch {}
 
-
-            // --------------------------------------------------
-            // إعادة الرسم
-            // --------------------------------------------------
 
             return sendDrawing(
                 m,
@@ -924,18 +1099,22 @@ handler.all = async function (m) {
 
 
         // ======================================================
-        // واش الميساج صورة؟
+        // مهم:
+        // غير الصور الحقيقية
+        //
+        // Sticker = image/webp
+        // وغادي يتجاهلو.
         // ======================================================
 
         if (
-            !isImageMessage(m)
+            !isRealPhoto(m)
         ) {
             return
         }
 
 
         // ======================================================
-        // ⌛ مباشرة
+        // ⌛
         // ======================================================
 
         try {
@@ -944,7 +1123,7 @@ handler.all = async function (m) {
 
 
         // ======================================================
-        // رفع الصورة
+        // Upload
         // ======================================================
 
         const imageUrl =
@@ -962,7 +1141,7 @@ handler.all = async function (m) {
 
 
         // ======================================================
-        // إنشاء الرسم
+        // Generate
         // ======================================================
 
         return sendDrawing(
@@ -988,7 +1167,7 @@ handler.all = async function (m) {
 
 
 // ============================================================
-// معلومات Plugin
+// Plugin
 // ============================================================
 
 handler.help = [
