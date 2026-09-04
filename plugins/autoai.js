@@ -56,7 +56,7 @@ const gemini = {
 
     const finalPrompt =
       `${global.botPersonality}. ` +
-      `ممنوع تطاكي الناس وممنوع تجاوب على التفاعل أو الإيموجيات. ` +
+      `ممنوع تجاوب على التفاعل أو الإيموجيات. ` +
       `جاوب غير على الكلام المفيد: ${prompt}`;
 
     const headers = {
@@ -187,7 +187,7 @@ let handler = async (m, { text, command }) => {
 
       return m.reply(
         '✅ *تم تشغيل الذكاء الاصطناعي التلقائي.*\n\n' +
-        'دابا البوت غادي يرد غير على الرسائل النصية.'
+        'دابا البوت غادي يرد غير على الرسائل النصية وبدون الروابط.'
       );
     }
 
@@ -243,6 +243,16 @@ handler.before = async (m, { conn }) => {
   // =========================
 
   if (/^[.#/\\!]/.test(text)) return;
+
+  // =========================
+  // 🚫 تجاهل أي رسالة فيها رابط
+  // =========================
+
+  const hasLink =
+    /(https?:\/\/|http:\/\/|www\.|wa\.me\/|chat\.whatsapp\.com\/|t\.me\/|telegram\.me\/|instagram\.com\/|facebook\.com\/|youtube\.com\/|youtu\.be\/|vm\.tiktok\.com\/|tiktok\.com\/)/i
+      .test(text);
+
+  if (hasLink) return;
 
   // =========================
   // تجاهل الإيموجيات فقط
