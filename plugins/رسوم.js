@@ -1,11 +1,15 @@
 /**
  * 🎨 DAMAR-MD AUTO DRAW
  *
- * Bot: 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃
- * Developer: أبو دمار شامل
+ * 📷 صورة حقيقية
+ *      ↓
+ * ✏️ رسم بالقلم الرصاص
+ *      ↓
+ * 📖 ورقة دفتر حقيقية
+ *      ↓
+ * ✏️ قلم بجانب الورقة
  *
- * 📷 الصور فقط → ✏️ رسم بالقلم
- *
+ * الأوامر:
  * .رسوم
  * .رسوم اون
  * .رسوم اوف
@@ -14,35 +18,53 @@
 import axios from 'axios'
 import FormData from 'form-data'
 
-
 // ============================================================
 // الإعدادات
 // ============================================================
 
 const BOT_NAME = '𝐃𝐀𝐌𝐀𝐑-𝐌𝐃'
-
 const DEVELOPER = 'أبو دمار شامل'
 
 const DEVELOPER_FACEBOOK =
     'https://www.facebook.com/profile.php?id=61591783185803'
 
+// ============================================================
+// API
+// ============================================================
+
+const UPLOAD_API =
+    'https://tmp.malvryx.dev/upload'
+
+const DRAW_API =
+    'https://omegatech-api.dixonomega.tech/api/ai/nano-banana2'
+
+const RESULT_API =
+    'https://omegatech-api.dixonomega.tech/api/ai/nano-banana2-result'
 
 // ============================================================
-// حالة الرسم التلقائي
+// الإعدادات السريعة
+// ============================================================
+
+const POLL_INTERVAL = 2000
+const MAX_WAIT = 55000
+
+// ============================================================
+// الحالة
 // ============================================================
 
 if (typeof global.damarDrawEnabled === 'undefined') {
     global.damarDrawEnabled = true
 }
 
-
-// ============================================================
-// جلسات تغيير الرسم
-// ============================================================
-
 global.damarDrawSessions =
     global.damarDrawSessions || new Map()
 
+// ============================================================
+// النوم
+// ============================================================
+
+const sleep = ms =>
+    new Promise(resolve => setTimeout(resolve, ms))
 
 // ============================================================
 // استخراج النص
@@ -56,13 +78,14 @@ function getText(m) {
         m?.message?.conversation ||
         m?.message?.extendedTextMessage?.text ||
         m?.message?.imageMessage?.caption ||
+        m?.message?.viewOnceMessage?.message?.imageMessage?.caption ||
+        m?.message?.viewOnceMessageV2?.message?.imageMessage?.caption ||
         ''
     ).trim()
 }
 
-
 // ============================================================
-// استخراج MIME
+// MIME
 // ============================================================
 
 function getMime(m) {
@@ -77,38 +100,17 @@ function getMime(m) {
     ).toLowerCase()
 }
 
-
 // ============================================================
-// التأكد أنها صورة حقيقية
-// ============================================================
-//
-// مهم:
-// image/webp = غالباً Sticker
-// لذلك ممنوع يدخل للرسم.
-//
-// المسموح:
-// image/jpeg
-// image/jpg
-// image/png
-// image/heic
-// image/heif
-//
+// صورة حقيقية فقط
 // ============================================================
 
 function isRealPhoto(m) {
 
-    if (!m) {
-        return false
-    }
+    if (!m) return false
 
+    const mime = getMime(m)
 
-    // --------------------------------------------------------
-    // Sticker = ممنوع
-    // --------------------------------------------------------
-
-    const mime =
-        getMime(m)
-
+    // منع الستيكيرات
     if (
         mime === 'image/webp' ||
         mime === 'image/x-webp'
@@ -116,22 +118,12 @@ function isRealPhoto(m) {
         return false
     }
 
-
-    // --------------------------------------------------------
-    // صورة Baileys مباشرة
-    // --------------------------------------------------------
-
-    if (
-        m?.message?.imageMessage
-    ) {
+    // صورة عادية
+    if (m?.message?.imageMessage) {
         return true
     }
 
-
-    // --------------------------------------------------------
     // View Once
-    // --------------------------------------------------------
-
     if (
         m?.message
             ?.viewOnceMessage
@@ -141,11 +133,7 @@ function isRealPhoto(m) {
         return true
     }
 
-
-    // --------------------------------------------------------
     // View Once V2
-    // --------------------------------------------------------
-
     if (
         m?.message
             ?.viewOnceMessageV2
@@ -155,184 +143,124 @@ function isRealPhoto(m) {
         return true
     }
 
-
-    // --------------------------------------------------------
-    // Gaff / Baileys normalized message
-    // --------------------------------------------------------
-
-    if (
-        m?.mtype === 'imageMessage'
-    ) {
+    // Baileys normalized
+    if (m?.mtype === 'imageMessage') {
         return true
     }
 
-
-    // --------------------------------------------------------
-    // MIME فقط للصور الحقيقية
-    // --------------------------------------------------------
-
-    if (
-        mime === 'image/jpeg' ||
-        mime === 'image/jpg' ||
-        mime === 'image/png' ||
-        mime === 'image/heic' ||
-        mime === 'image/heif'
-    ) {
-        return true
-    }
-
-
-    return false
+    // MIME
+    return [
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/heic',
+        'image/heif'
+    ].includes(mime)
 }
 
-
 // ============================================================
-// التحقق من صورة البوت
+// منع معالجة صورة البوت
 // ============================================================
-//
-// باش ما يدخلش فحلقة:
-// البوت يرسل صورة → البوت يعالجها مرة أخرى
-//
 
 function isBotGeneratedImage(m) {
 
-    const text =
-        getText(m)
+    const text = getText(m)
 
-    if (!text) {
-        return false
-    }
+    if (!text) return false
 
     return (
         text.includes(BOT_NAME) &&
-        text.includes(
-            'تم تحويل الصورة إلى رسم'
+        (
+            text.includes('Graphite Sketch') ||
+            text.includes('AUTO DRAW') ||
+            text.includes('تم تحويل الصورة')
         )
     )
 }
 
-
 // ============================================================
-// رفع الصورة
+// تحميل الصورة ورفعها
 // ============================================================
 
 async function uploadImage(m) {
 
     try {
 
-        let target =
-            m
+        let target = m
 
+        // ====================================================
+        // إذا كانت Reply لصورة
+        // ====================================================
 
-        // --------------------------------------------------------
-        // إذا كان Reply على صورة
-        // --------------------------------------------------------
-        //
-        // هذا غير مفيد للـAUTO.
-        // لكن خليه موجود باش يبقى الكود متوافق.
-        //
-
-        if (m?.quoted) {
-
-            const quotedMime =
-                getMime(m.quoted)
-
-            if (
-                quotedMime === 'image/jpeg' ||
-                quotedMime === 'image/jpg' ||
-                quotedMime === 'image/png' ||
-                quotedMime === 'image/heic' ||
-                quotedMime === 'image/heif'
-            ) {
-
-                target =
-                    m.quoted
-            }
+        if (m?.quoted && isRealPhoto(m.quoted)) {
+            target = m.quoted
         }
 
+        // ====================================================
+        // تأكيد الصورة
+        // ====================================================
 
-        // --------------------------------------------------------
-        // لازم تكون صورة حقيقية
-        // --------------------------------------------------------
-
-        if (
-            !isRealPhoto(target)
-        ) {
+        if (!isRealPhoto(target)) {
             return null
         }
 
-
-        // --------------------------------------------------------
+        // ====================================================
         // تحميل الصورة
-        // --------------------------------------------------------
+        // ====================================================
 
         const buffer =
             await target.download()
 
-
-        if (!buffer) {
+        if (!buffer || !buffer.length) {
+            console.log('[DAMAR DRAW] الصورة فارغة')
             return null
         }
 
-
-        // --------------------------------------------------------
+        // ====================================================
         // MIME
-        // --------------------------------------------------------
+        // ====================================================
 
-        let mime =
-            getMime(target)
-
+        let mime = getMime(target)
 
         if (
             !mime ||
             mime === 'image/webp'
         ) {
-            mime =
-                'image/jpeg'
+            mime = 'image/jpeg'
         }
 
-
-        // --------------------------------------------------------
+        // ====================================================
         // FormData
-        // --------------------------------------------------------
+        // ====================================================
 
-        const form =
-            new FormData()
-
+        const form = new FormData()
 
         form.append(
             'file',
             buffer,
             {
-                filename:
-                    'damar-draw.jpg',
-
-                contentType:
-                    mime
+                filename: 'damar-draw.jpg',
+                contentType: mime
             }
         )
-
 
         form.append(
             'type',
             'permanent'
         )
 
-
-        // --------------------------------------------------------
+        // ====================================================
         // Upload
-        // --------------------------------------------------------
+        // ====================================================
 
         const response =
             await axios.post(
-                'https://tmp.malvryx.dev/upload',
+                UPLOAD_API,
                 form,
                 {
-                    headers:
-                        form.getHeaders(),
+                    headers: form.getHeaders(),
 
-                    timeout:
-                        30000,
+                    timeout: 20000,
 
                     maxBodyLength:
                         Infinity,
@@ -342,181 +270,491 @@ async function uploadImage(m) {
                 }
             )
 
+        const data =
+            response?.data || {}
 
-        return (
-            response.data?.cdnUrl ||
-            response.data?.directUrl ||
-            response.data?.url ||
+        const url =
+            data?.cdnUrl ||
+            data?.directUrl ||
+            data?.url ||
+            data?.data?.url ||
+            data?.data?.cdnUrl ||
             null
-        )
+
+        if (!url) {
+
+            console.log(
+                '[DAMAR DRAW UPLOAD RESULT]',
+                JSON.stringify(data).slice(0, 1000)
+            )
+
+            return null
+        }
+
+        return url
 
     } catch (error) {
 
         console.error(
-            '[DAMAR DRAW UPLOAD]',
-            error?.message || error
+            '[DAMAR DRAW UPLOAD ERROR]',
+            error?.response?.data ||
+            error?.message ||
+            error
         )
 
         return null
     }
 }
 
+// ============================================================
+// Prompt سريع
+// ============================================================
+
+const DRAW_PROMPT = `
+Edit the reference photo into a highly realistic graphite pencil portrait
+drawn by hand on a real vertical notebook page.
+
+IMPORTANT:
+Preserve the exact person's identity, face, hairstyle, facial structure,
+clothing, pose and recognizable features from the reference photo.
+
+The result must look like a real photograph of a physical notebook.
+
+Create:
+- warm white notebook paper
+- subtle horizontal notebook lines
+- realistic paper fibers
+- realistic spiral notebook binding
+- detailed graphite pencil portrait
+- fine pencil strokes
+- realistic facial shading
+- natural cross-hatching
+- realistic graphite texture
+- a real wooden pencil lying beside the notebook
+- realistic desk and soft natural lighting
+
+Near the pencil write exactly:
+
+𝐃𝐀𝐌𝐀𝐑-𝐌𝐃
+
+The text must be readable.
+
+Do not add another person.
+Do not change the person's identity.
+Do not use anime, cartoon, manga, CGI, 3D, watercolor or colorful painting.
+
+The final image must look like a real photograph of a real pencil drawing
+on a real notebook page.
+
+Output only one image.
+Use a fast 1K generation.
+`
+
+// ============================================================
+// استخراج URL من أي شكل محتمل
+// ============================================================
+
+function extractImageUrl(data) {
+
+    if (!data) {
+        return null
+    }
+
+    // ========================================================
+    // الشكل المباشر
+    // ========================================================
+
+    if (typeof data === 'string') {
+
+        if (
+            data.startsWith('http://') ||
+            data.startsWith('https://')
+        ) {
+            return data
+        }
+
+        // JSON string
+        try {
+
+            const parsed =
+                JSON.parse(data)
+
+            return extractImageUrl(parsed)
+
+        } catch {}
+    }
+
+    // ========================================================
+    // URLs مباشرة
+    // ========================================================
+
+    const direct =
+        data?.image_url ||
+        data?.imageUrl ||
+        data?.url ||
+        data?.result_url ||
+        data?.resultUrl ||
+        data?.file_url ||
+        data?.fileUrl ||
+        data?.output_url ||
+        data?.outputUrl
+
+    if (
+        typeof direct === 'string' &&
+        (
+            direct.startsWith('http://') ||
+            direct.startsWith('https://')
+        )
+    ) {
+        return direct
+    }
+
+    // ========================================================
+    // arrays
+    // ========================================================
+
+    const arrays = [
+        data?.result_urls,
+        data?.resultUrls,
+        data?.image_urls,
+        data?.imageUrls,
+        data?.images,
+        data?.urls,
+        data?.files,
+        data?.outputFiles,
+        data?.output_files
+    ]
+
+    for (const arr of arrays) {
+
+        if (!Array.isArray(arr)) {
+            continue
+        }
+
+        for (const item of arr) {
+
+            if (typeof item === 'string') {
+
+                if (
+                    item.startsWith('http://') ||
+                    item.startsWith('https://')
+                ) {
+                    return item
+                }
+
+            }
+
+            if (item && typeof item === 'object') {
+
+                const found =
+                    item?.url ||
+                    item?.fileUrl ||
+                    item?.file_url ||
+                    item?.image_url ||
+                    item?.imageUrl
+
+                if (
+                    typeof found === 'string' &&
+                    (
+                        found.startsWith('http://') ||
+                        found.startsWith('https://')
+                    )
+                ) {
+                    return found
+                }
+            }
+        }
+    }
+
+    // ========================================================
+    // resultJson
+    // ========================================================
+
+    if (data?.resultJson) {
+
+        try {
+
+            const result =
+                typeof data.resultJson === 'string'
+                    ? JSON.parse(data.resultJson)
+                    : data.resultJson
+
+            const found =
+                extractImageUrl(result)
+
+            if (found) {
+                return found
+            }
+
+        } catch {}
+    }
+
+    // ========================================================
+    // response
+    // ========================================================
+
+    if (data?.response) {
+
+        try {
+
+            const result =
+                typeof data.response === 'string'
+                    ? JSON.parse(data.response)
+                    : data.response
+
+            const found =
+                extractImageUrl(result)
+
+            if (found) {
+                return found
+            }
+
+        } catch {}
+    }
+
+    // ========================================================
+    // data داخل data
+    // ========================================================
+
+    if (
+        data?.data &&
+        typeof data.data === 'object'
+    ) {
+
+        const found =
+            extractImageUrl(data.data)
+
+        if (found) {
+            return found
+        }
+    }
+
+    return null
+}
+
+// ============================================================
+// تحديد حالة المهمة
+// ============================================================
+
+function getTaskStatus(data) {
+
+    if (!data) {
+        return ''
+    }
+
+    return String(
+        data?.status ||
+        data?.state ||
+        data?.data?.status ||
+        data?.data?.state ||
+        ''
+    ).toLowerCase()
+}
 
 // ============================================================
 // إنشاء الرسم
 // ============================================================
 
-async function generateDrawing(
-    imageUrl
-) {
+async function generateDrawing(imageUrl) {
 
-    const prompt = `
-Transform the provided photograph into a highly detailed realistic graphite pencil drawing.
+    console.log('[DAMAR DRAW] بدء إنشاء الرسم')
 
-IMPORTANT:
-Keep exactly the same person, face, identity, hairstyle, pose and composition.
-
-The result must look like a real artist manually drew the original photograph on white paper.
-
-STYLE:
-realistic graphite pencil drawing
-professional hand drawn portrait
-fine pencil lines
-detailed facial features
-realistic eyes
-realistic eyebrows
-realistic lips
-detailed hair strokes
-soft graphite shading
-cross hatching
-natural shadows
-white paper
-high detail
-realistic sketch
-
-DO NOT:
-change the person's identity
-change the face
-change the pose
-add another person
-remove the person
-add text
-add watermark
-add logo
-add frame
-add decorations
-use anime
-use cartoon
-use 3D
-use colorful painting
-use digital painting
-
-Keep the original composition.
-
-Make the final result look like a real pencil drawing made by a professional artist.
-`
-
+    // ========================================================
+    // إنشاء الرابط
+    // ========================================================
 
     const apiUrl =
-        'https://omegatech-api.dixonomega.tech/api/ai/nano-banana2' +
-        `?prompt=${encodeURIComponent(prompt)}` +
+        DRAW_API +
+        `?prompt=${encodeURIComponent(DRAW_PROMPT)}` +
         `&image=${encodeURIComponent(imageUrl)}`
 
-
-    // --------------------------------------------------------
-    // Start
-    // --------------------------------------------------------
+    // ========================================================
+    // إرسال المهمة
+    // ========================================================
 
     const start =
         await axios.get(
             apiUrl,
             {
-                timeout:
-                    30000
+                timeout: 20000,
+                validateStatus: status =>
+                    status >= 200 &&
+                    status < 500
             }
         )
 
+    const startData =
+        start?.data || {}
+
+    console.log(
+        '[DAMAR DRAW START]',
+        JSON.stringify(startData).slice(0, 1500)
+    )
+
+    // ========================================================
+    // استخراج Task ID من عدة أشكال
+    // ========================================================
 
     const taskId =
-        start.data?.task_id
+        startData?.task_id ||
+        startData?.taskId ||
+        startData?.data?.task_id ||
+        startData?.data?.taskId ||
+        startData?.id
 
+    // ========================================================
+    // إذا API رجع الصورة مباشرة
+    // ========================================================
+
+    const directImage =
+        extractImageUrl(startData)
+
+    if (directImage) {
+        console.log('[DAMAR DRAW] الصورة رجعات مباشرة')
+        return directImage
+    }
+
+    // ========================================================
+    // لا يوجد Task ID
+    // ========================================================
 
     if (!taskId) {
 
         console.error(
-            '[DAMAR DRAW API START]',
-            start.data
+            '[DAMAR DRAW] API لم ترجع task_id',
+            JSON.stringify(startData).slice(0, 2000)
         )
 
         throw new Error(
-            'API ما رجعاتش task_id'
+            'API_NO_TASK'
         )
     }
 
+    console.log(
+        '[DAMAR DRAW] Task:',
+        taskId
+    )
 
-    // --------------------------------------------------------
-    // انتظار النتيجة
-    // --------------------------------------------------------
-    //
-    // 20 × 3 ثواني
-    // حوالي دقيقة كحد أقصى
-    //
+    // ========================================================
+    // Polling سريع
+    // ========================================================
 
-    for (
-        let attempt = 0;
-        attempt < 20;
-        attempt++
+    const startedAt =
+        Date.now()
+
+    let lastStatus = ''
+
+    while (
+        Date.now() - startedAt <
+        MAX_WAIT
     ) {
 
-        await new Promise(
-            resolve =>
-                setTimeout(
-                    resolve,
-                    3000
-                )
+        await sleep(
+            POLL_INTERVAL
         )
-
 
         try {
 
             const response =
                 await axios.get(
-                    'https://omegatech-api.dixonomega.tech/api/ai/nano-banana2-result' +
+                    RESULT_API +
                     `?task_id=${encodeURIComponent(taskId)}`,
                     {
-                        timeout:
-                            15000
+                        timeout: 10000,
+                        validateStatus:
+                            status =>
+                                status >= 200 &&
+                                status < 500
                     }
                 )
 
-
             const data =
-                response.data
+                response?.data || {}
 
+            const status =
+                getTaskStatus(data)
 
-            // --------------------------------------------------
-            // نجح
-            // --------------------------------------------------
+            // ==================================================
+            // Log فقط عند تغير الحالة
+            // ==================================================
 
-            if (
-                data?.status === 'completed' &&
-                data?.image_url
-            ) {
+            if (status !== lastStatus) {
 
-                return data.image_url
+                console.log(
+                    '[DAMAR DRAW STATUS]',
+                    status || 'unknown'
+                )
+
+                lastStatus =
+                    status
             }
 
+            // ==================================================
+            // الصورة جاهزة
+            // ==================================================
 
-            // --------------------------------------------------
-            // فشل
-            // --------------------------------------------------
+            const result =
+                extractImageUrl(data)
+
+            if (result) {
+
+                console.log(
+                    '[DAMAR DRAW] تم إنشاء الصورة في',
+                    Math.round(
+                        (Date.now() - startedAt) / 1000
+                    ),
+                    'ثانية'
+                )
+
+                return result
+            }
+
+            // ==================================================
+            // حالات النجاح حتى لو ماكانش status موحد
+            // ==================================================
 
             if (
-                data?.status === 'failed'
+                [
+                    'completed',
+                    'complete',
+                    'finished',
+                    'success',
+                    'succeeded',
+                    'done'
+                ].includes(status)
             ) {
 
+                console.log(
+                    '[DAMAR DRAW] المهمة انتهت بدون رابط واضح'
+                )
+
+                // نعطي دورة إضافية لاستخراج الرابط
+                await sleep(1000)
+
+                continue
+            }
+
+            // ==================================================
+            // حالات الفشل
+            // ==================================================
+
+            if (
+                [
+                    'failed',
+                    'fail',
+                    'error',
+                    'cancelled',
+                    'canceled'
+                ].includes(status)
+            ) {
+
+                console.error(
+                    '[DAMAR DRAW FAILED]',
+                    JSON.stringify(data).slice(0, 2000)
+                )
+
                 throw new Error(
-                    'generation_failed'
+                    'GENERATION_FAILED'
                 )
             }
 
@@ -524,29 +762,26 @@ Make the final result look like a real pencil drawing made by a professional art
 
             if (
                 error?.message ===
-                'generation_failed'
+                'GENERATION_FAILED'
             ) {
-
                 throw error
             }
 
-
+            // أخطاء الشبكة المؤقتة لا توقف المهمة
             console.log(
-                '[DAMAR DRAW CHECK]',
+                '[DAMAR DRAW POLL]',
                 error?.message || error
             )
         }
     }
 
-
     throw new Error(
-        'generation_timeout'
+        'GENERATION_TIMEOUT'
     )
 }
 
-
 // ============================================================
-// إرسال النتيجة
+// إرسال الرسم
 // ============================================================
 
 async function sendDrawing(
@@ -558,53 +793,43 @@ async function sendDrawing(
 
     try {
 
-        // --------------------------------------------------------
-        // إنشاء الرسم
-        // --------------------------------------------------------
+        // ====================================================
+        // إنشاء الصورة
+        // ====================================================
 
         const resultUrl =
             await generateDrawing(
                 imageUrl
             )
 
-
         if (!resultUrl) {
-
             throw new Error(
-                'No result image'
+                'NO_RESULT_IMAGE'
             )
         }
 
-
-        // --------------------------------------------------------
+        // ====================================================
         // Session
-        // --------------------------------------------------------
+        // ====================================================
 
         const sessionId =
             Date.now().toString(36) +
             Math.random()
                 .toString(36)
-                .substring(2, 8)
-
+                .slice(2, 8)
 
         global.damarDrawSessions.set(
             sessionId,
             {
-                image:
-                    imageUrl,
-
-                sender:
-                    sender,
-
-                created:
-                    Date.now()
+                image: imageUrl,
+                sender,
+                created: Date.now()
             }
         )
 
-
-        // --------------------------------------------------------
-        // حذف الجلسة بعد 10 دقائق
-        // --------------------------------------------------------
+        // ====================================================
+        // حذف Session
+        // ====================================================
 
         setTimeout(
             () => {
@@ -617,76 +842,59 @@ async function sendDrawing(
             10 * 60 * 1000
         )
 
-
-        // --------------------------------------------------------
+        // ====================================================
         // إرسال الصورة
-        // --------------------------------------------------------
+        // ====================================================
 
         await conn.sendButton(
             m.chat,
             {
-
                 image: {
-                    url:
-                        resultUrl
+                    url: resultUrl
                 },
-
 
                 caption:
 `╭━━━⪩ 🎨 ${BOT_NAME} ⪨━━━⬣
 ┃
 ┃ ✏️ تم تحويل الصورة إلى رسم
-┃ 🖼️ رسم بالقلم الرصاص
-┃ ⚡ AUTO DRAW
+┃ 📖 فوق ورقة دفتر
+┃ 🖊️ قلم رصاص بجانب الرسم
 ┃
-┃ 👑 المطور: ${DEVELOPER}
+┃ ⚡ AUTO DRAW
+┃ 🖼️ Graphite Sketch
+┃
+┃ 👑 ${DEVELOPER}
 ┃
 ╰━━━━━━━━━━━━━━⬣`,
 
                 footer:
-                    `${BOT_NAME} • ${DEVELOPER}`,
-
+                    `${BOT_NAME} • AUTO DRAW`,
 
                 buttons: [
 
-                    // ==================================================
-                    // تغيير الرسم
-                    // ==================================================
-
                     {
-                        name:
-                            'quick_reply',
+                        name: 'quick_reply',
 
                         buttonParamsJson:
                             JSON.stringify({
-
                                 display_text:
                                     '🔄 تغيير الرسم',
 
                                 id:
                                     `damar_draw_again_${sessionId}`
-
                             })
                     },
 
-
-                    // ==================================================
-                    // حساب المطور
-                    // ==================================================
-
                     {
-                        name:
-                            'cta_url',
+                        name: 'cta_url',
 
                         buttonParamsJson:
                             JSON.stringify({
-
                                 display_text:
                                     '👤 حساب المطور',
 
                                 url:
                                     DEVELOPER_FACEBOOK
-
                             })
                     }
 
@@ -694,15 +902,9 @@ async function sendDrawing(
             },
 
             {
-                quoted:
-                    m
+                quoted: m
             }
         )
-
-
-        // --------------------------------------------------------
-        // Success
-        // --------------------------------------------------------
 
         try {
             await m.react('✅')
@@ -711,33 +913,34 @@ async function sendDrawing(
     } catch (error) {
 
         console.error(
-            '[DAMAR DRAW GENERATE]',
+            '[DAMAR DRAW GENERATE ERROR]',
             error?.message || error
         )
 
-
         try {
-            await m.react('❌')
+            await m.react('⚠️')
         } catch {}
 
+        // ====================================================
+        // ما نرسلش رسالة ❌ القديمة
+        // ====================================================
 
         try {
 
             await conn.reply(
                 m.chat,
 
-`❌ ${BOT_NAME}
+`⚠️ ${BOT_NAME}
 
-ما قدرتش نصايب الرسم دابا.
+وقع مشكل مؤقت فخدمة الرسم.
+عاود صيفط الصورة من جديد.`,
 
-جرب بصورة أخرى من فضلك.`,
                 m
             )
 
         } catch {}
     }
 }
-
 
 // ============================================================
 // استخراج ID ديال الأزرار
@@ -747,39 +950,23 @@ function getButtonId(m) {
 
     try {
 
-        // --------------------------------------------------------
-        // Buttons
-        // --------------------------------------------------------
-
         const button =
             m?.message
                 ?.buttonsResponseMessage
                 ?.selectedButtonId
 
-
         if (button) {
             return button
         }
-
-
-        // --------------------------------------------------------
-        // Template
-        // --------------------------------------------------------
 
         const template =
             m?.message
                 ?.templateButtonReplyMessage
                 ?.selectedId
 
-
         if (template) {
             return template
         }
-
-
-        // --------------------------------------------------------
-        // Interactive
-        // --------------------------------------------------------
 
         const params =
             m?.message
@@ -787,12 +974,10 @@ function getButtonId(m) {
                 ?.nativeFlowResponseMessage
                 ?.paramsJson
 
-
         if (params) {
 
             const data =
                 JSON.parse(params)
-
 
             return (
                 data?.id ||
@@ -809,13 +994,11 @@ function getButtonId(m) {
         )
     }
 
-
     return ''
 }
 
-
 // ============================================================
-// Handler ديال الأوامر
+// Handler
 // ============================================================
 
 const handler = async (
@@ -831,21 +1014,18 @@ const handler = async (
         const text =
             getText(m)
 
-
-        // ======================================================
-        // .رسوم فقط
-        // ======================================================
+        // ====================================================
+        // .رسوم
+        // ====================================================
 
         if (
-            /^(?:[.!/])?رسوم$/iu
-                .test(text)
+            /^(?:[.!/])?رسوم$/iu.test(text)
         ) {
 
             const status =
                 global.damarDrawEnabled === true
                     ? '🟢 ON'
                     : '🔴 OFF'
-
 
             return conn.reply(
                 m.chat,
@@ -855,28 +1035,25 @@ const handler = async (
 ┃ ✏️ الرسم التلقائي
 ┃ الحالة: ${status}
 ┃
-┃ 📷 كيفاش تخدم؟
-┃ صيفط أي صورة فقط
-┃ وغادي تتحول تلقائياً لرسم بالقلم ✏️
+┃ 📷 صيفط صورة حقيقية
 ┃
-┃ 🟢 تشغيل:
-┃ .رسوم اون
+┃ غادي تتحول إلى:
+┃ ✏️ رسم بالقلم
+┃ 📖 فوق ورقة دفتر
+┃ 🖊️ قلم بجانبها
 ┃
-┃ 🔴 إيقاف:
-┃ .رسوم اوف
-┃
-┃ 👑 المطور:
-┃ ${DEVELOPER}
+┃ 🟢 .رسوم اون
+┃ 🔴 .رسوم اوف
 ┃
 ╰━━━━━━━━━━━━━━⬣`,
+
                 m
             )
         }
 
-
-        // ======================================================
-        // .رسوم اون
-        // ======================================================
+        // ====================================================
+        // ON
+        // ====================================================
 
         if (
             /^(?:[.!/])?رسوم\s+(اون|on)$/iu
@@ -891,19 +1068,17 @@ const handler = async (
 `❌ هاد الأمر خاص بصاحب البوت فقط.
 
 👑 ${DEVELOPER}`,
+
                     m
                 )
             }
 
-
             global.damarDrawEnabled =
                 true
-
 
             try {
                 await m.react('✅')
             } catch {}
-
 
             return conn.reply(
                 m.chat,
@@ -912,20 +1087,18 @@ const handler = async (
 ┃
 ┃ 🟢 الرسم التلقائي: ON
 ┃
-┃ 📷 أي صورة حقيقية
-┃ ✏️ غادي تتحول تلقائياً لرسم
-┃
-┃ 👑 المطور: ${DEVELOPER}
+┃ 📷 صيفط صورة حقيقية
+┃ ⚡ توليد سريع
 ┃
 ╰━━━━━━━━━━━━━━⬣`,
+
                 m
             )
         }
 
-
-        // ======================================================
-        // .رسوم اوف
-        // ======================================================
+        // ====================================================
+        // OFF
+        // ====================================================
 
         if (
             /^(?:[.!/])?رسوم\s+(اوف|off)$/iu
@@ -940,19 +1113,17 @@ const handler = async (
 `❌ هاد الأمر خاص بصاحب البوت فقط.
 
 👑 ${DEVELOPER}`,
+
                     m
                 )
             }
 
-
             global.damarDrawEnabled =
                 false
-
 
             try {
                 await m.react('🛑')
             } catch {}
-
 
             return conn.reply(
                 m.chat,
@@ -965,6 +1136,7 @@ const handler = async (
 ┃ .رسوم اون
 ┃
 ╰━━━━━━━━━━━━━━⬣`,
+
                 m
             )
         }
@@ -978,7 +1150,6 @@ const handler = async (
     }
 }
 
-
 // ============================================================
 // AUTO DRAW
 // ============================================================
@@ -990,10 +1161,9 @@ handler.all = async function (m) {
         const conn =
             this
 
-
-        // ======================================================
+        // ====================================================
         // OFF
-        // ======================================================
+        // ====================================================
 
         if (
             global.damarDrawEnabled !== true
@@ -1001,21 +1171,17 @@ handler.all = async function (m) {
             return
         }
 
+        // ====================================================
+        // Baileys
+        // ====================================================
 
-        // ======================================================
-        // تجاهل رسائل النظام
-        // ======================================================
-
-        if (
-            m?.isBaileys
-        ) {
+        if (m?.isBaileys) {
             return
         }
 
-
-        // ======================================================
-        // تجاهل الصور الناتجة ديال البوت
-        // ======================================================
+        // ====================================================
+        // صورة مولدة
+        // ====================================================
 
         if (
             isBotGeneratedImage(m)
@@ -1023,14 +1189,12 @@ handler.all = async function (m) {
             return
         }
 
-
-        // ======================================================
+        // ====================================================
         // زر تغيير الرسم
-        // ======================================================
+        // ====================================================
 
         const buttonId =
             getButtonId(m)
-
 
         if (
             buttonId &&
@@ -1045,12 +1209,10 @@ handler.all = async function (m) {
                     ''
                 )
 
-
             const session =
                 global.damarDrawSessions.get(
                     sessionId
                 )
-
 
             if (!session) {
 
@@ -1062,14 +1224,10 @@ handler.all = async function (m) {
 هاد الزر سالات الصلاحية ديالو.
 
 📷 صيفط الصورة من جديد.`,
+
                     m
                 )
             }
-
-
-            // --------------------------------------------------
-            // غير صاحب الصورة
-            // --------------------------------------------------
 
             if (
                 session.sender !==
@@ -1083,11 +1241,9 @@ handler.all = async function (m) {
                 )
             }
 
-
             try {
                 await m.react('⌛')
             } catch {}
-
 
             return sendDrawing(
                 m,
@@ -1097,14 +1253,9 @@ handler.all = async function (m) {
             )
         }
 
-
-        // ======================================================
-        // مهم:
-        // غير الصور الحقيقية
-        //
-        // Sticker = image/webp
-        // وغادي يتجاهلو.
-        // ======================================================
+        // ====================================================
+        // الصور فقط
+        // ====================================================
 
         if (
             !isRealPhoto(m)
@@ -1112,37 +1263,33 @@ handler.all = async function (m) {
             return
         }
 
-
-        // ======================================================
-        // ⌛
-        // ======================================================
+        // ====================================================
+        // بدء المعالجة
+        // ====================================================
 
         try {
             await m.react('⌛')
         } catch {}
 
-
-        // ======================================================
-        // Upload
-        // ======================================================
+        // ====================================================
+        // رفع الصورة
+        // ====================================================
 
         const imageUrl =
             await uploadImage(m)
 
-
         if (!imageUrl) {
 
             try {
-                await m.react('❌')
+                await m.react('⚠️')
             } catch {}
 
             return
         }
 
-
-        // ======================================================
-        // Generate
-        // ======================================================
+        // ====================================================
+        // إنشاء الرسم
+        // ====================================================
 
         return sendDrawing(
             m,
@@ -1158,13 +1305,11 @@ handler.all = async function (m) {
             error?.message || error
         )
 
-
         try {
-            await m.react('❌')
+            await m.react('⚠️')
         } catch {}
     }
 }
-
 
 // ============================================================
 // Plugin
