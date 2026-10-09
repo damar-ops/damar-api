@@ -1,16 +1,15 @@
 {
-  "name": "damar-md-pairing-api",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.18",
-    "cors": "^2.8.5",
-    "express": "^4.21.2",
-    "pino": "^9.6.0"
-  }
+"name": "damar-md-pairing-api",
+"version": "1.0.0",
+"private": true,
+"type": "module",
+"scripts": {
+"start": "node index.js"
+},
+"dependencies": {
+"@whiskeysockets/baileys": "6.7.18",
+"cors": "^2.8.5",
+"express": "^4.21.2",
+"pino": "^9.6.0"
+}
 }
