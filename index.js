@@ -1,309 +1,226 @@
+import express from 'express';
+import cors from 'cors';
+import pino from 'pino';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 
-import express from 'express'
-import cors from 'cors'
-import fs from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
-import pino from 'pino'
+import * as baileys from '@whiskeysockets/baileys';
 
-import makeWASocket, {
-  useMultiFileAuthState,
-  DisconnectReason,
-  Browsers,
-  fetchLatestBaileysVersion
-} from '@whiskeysockets/baileys'
+const app = express();
+const PORT = Number(process.env.PORT) || 3000;
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const app = express()
-const PORT = process.env.PORT || 8080
-const BOT_NAME = 'DAMAR-MD'
-const AUTH_DIR = process.env.AUTH_DIR ||
-  (fs.existsSync('/data')
-    ? '/data/damar-auth'
-    : path.join(__dirname, 'auth'))
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const logger = pino({ level: process.env.LOG_LEVEL || 'warn' })
+const logger = pino({ level: 'warn' });
+
+/*
+ * دعم صيغ التصدير المحتملة، مع التحقق من النتيجة.
+ */
+const makeWASocket =
+  baileys.default?.default ??
+  baileys.default?.makeWASocket ??
+  baileys.default ??
+  baileys.makeWASocket;
+
+const useMultiFileAuthState =
+  baileys.useMultiFileAuthState ??
+  baileys.default?.useMultiFileAuthState;
+
+const Browsers =
+  baileys.Browsers ??
+  baileys.default?.Browsers;
+
+if (typeof makeWASocket !== 'function') {
+  console.error(
+    'Baileys export error:',
+    Object.keys(baileys)
+  );
+  throw new Error(
+    'Baileys makeWASocket export is not a function. Check installed version.'
+  );
+}
+
+if (typeof useMultiFileAuthState !== 'function') {
+  throw new Error(
+    'Baileys useMultiFileAuthState is unavailable.'
+  );
+}
+
+app.disable('x-powered-by');
 
 app.use(cors({
-  origin: true,
+  origin: '*',
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}))
-app.use(express.json({ limit: '20kb' }))
-app.use(express.urlencoded({ extended: true }))
+  allowedHeaders: ['Content-Type']
+}));
 
-let sock = null
-let authState = null
-let saveCreds = null
-let status = 'starting'
-let lastError = null
-let lastNumber = null
-let reconnectTimer = null
-let starting = null
-let pairingInProgress = false
-let reconnectAttempts = 0
+app.use(express.json({ limit: '32kb' }));
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+const sessionsDir =
+  process.env.AUTH_DIR ||
+  path.join(__dirname, 'sessions');
 
-function cleanNumber(value) {
-  let number = String(value || '').replace(/\D/g, '')
-  if (number.startsWith('00')) number = number.slice(2)
-  return number
+await fs.mkdir(sessionsDir, { recursive: true });
+
+const activeRequests = new Map();
+const lastRequests = new Map();
+
+function normalizeNumber(value) {
+  return String(value ?? '').replace(/\D/g, '');
 }
 
-async function startWhatsApp() {
-  if (starting) return starting
-
-  starting = (async () => {
-    fs.mkdirSync(AUTH_DIR, { recursive: true })
-
-    const auth = await useMultiFileAuthState(AUTH_DIR)
-    authState = auth.state
-    saveCreds = auth.saveCreds
-
-    let version
-    try {
-      const latest = await fetchLatestBaileysVersion()
-      version = latest.version
-    } catch (error) {
-      console.warn('Could not fetch latest WhatsApp version:', error.message)
-    }
-
-    const options = {
-      auth: authState,
-      logger,
-      browser: Browsers.ubuntu(BOT_NAME),
-      printQRInTerminal: false,
-      markOnlineOnConnect: false,
-      syncFullHistory: false,
-      connectTimeoutMs: 60000,
-      defaultQueryTimeoutMs: 60000,
-      keepAliveIntervalMs: 30000
-    }
-
-    if (version) options.version = version
-
-    const socket = makeWASocket(options)
-    sock = socket
-    status = 'connecting'
-    lastError = null
-
-    socket.ev.on('creds.update', async () => {
-      try {
-        await saveCreds()
-      } catch (error) {
-        lastError = { message: error.message }
-        console.error('Saving credentials failed:', error.message)
-      }
-    })
-
-    socket.ev.on('connection.update', update => {
-      if (sock !== socket) return
-
-      if (update.connection === 'connecting') {
-        status = 'connecting'
-      }
-
-      if (update.connection === 'open') {
-        status = 'connected'
-        lastError = null
-        reconnectAttempts = 0
-        console.log(`${BOT_NAME}: WhatsApp connected`)
-      }
-
-      if (update.connection === 'close') {
-        const error = update.lastDisconnect?.error
-        const code = error?.output?.statusCode ??
-          error?.statusCode ?? null
-
-        status = 'disconnected'
-        lastError = {
-          statusCode: code,
-          message: error?.message || 'Connection closed'
-        }
-
-        console.error('WhatsApp disconnected:', lastError)
-
-        sock = null
-
-        if (code === DisconnectReason.loggedOut ||
-            code === DisconnectReason.badSession) {
-          status = code === DisconnectReason.loggedOut
-            ? 'logged_out'
-            : 'bad_session'
-          return
-        }
-
-        scheduleReconnect()
-      }
-    })
-  })()
-
-  try {
-    await starting
-  } finally {
-    starting = null
-  }
-}
-
-function scheduleReconnect() {
-  if (reconnectTimer) return
-
-  reconnectAttempts += 1
-  const delay = Math.min(5000 * reconnectAttempts, 30000)
-
-  reconnectTimer = setTimeout(async () => {
-    reconnectTimer = null
-    try {
-      await startWhatsApp()
-    } catch (error) {
-      lastError = { message: error.message }
-      console.error('Reconnect failed:', error.message)
-      scheduleReconnect()
-    }
-  }, delay)
-}
-
-async function requestCode(rawNumber) {
-  const number = cleanNumber(rawNumber)
-
-  if (!/^\d{8,15}$/.test(number)) {
-    throw new Error('دخل رقم واتساب صحيح مع مفتاح الدولة، بلا + ولا مسافات.')
-  }
-
-  if (pairingInProgress) {
-    throw new Error('كاين طلب ربط آخر، تسنى شوية وعاود.')
-  }
-
-  pairingInProgress = true
-
-  try {
-    if (!sock) await startWhatsApp()
-
-    // Give the socket time to initialize.
-    for (let i = 0; i < 20 && !sock; i++) {
-      await sleep(500)
-    }
-
-    if (!sock) throw new Error('WhatsApp socket is not ready. Check Railway logs.')
-
-    if (authState?.creds?.registered) {
-      throw new Error(
-        'هاد الجلسة مربوطة من قبل. ما يمكنش توليد كود جديد لنفس الجلسة.'
-      )
-    }
-
-    if (status === 'logged_out' || status === 'bad_session') {
-      throw new Error('الجلسة فيها مشكل. راجع سجلات Railway والجلسة المحفوظة.')
-    }
-
-    const currentSocket = sock
-    const code = await currentSocket.requestPairingCode(number)
-
-    if (sock !== currentSocket) {
-      throw new Error('تقطع الاتصال أثناء طلب الكود. عاود المحاولة.')
-    }
-
-    lastNumber = number
-    return { number, code }
-  } finally {
-    pairingInProgress = false
-  }
+function validNumber(number) {
+  return /^\d{8,15}$/.test(number);
 }
 
 app.get('/', (_req, res) => {
   res.json({
-    success: true,
-    name: BOT_NAME,
-    message: 'DAMAR-MD Pairing API online',
-    status,
-    endpoints: ['/api/status', '/api/pair?number=212XXXXXXXXX']
-  })
-})
+    name: 'DAMAR-MD API',
+    status: 'online',
+    endpoints: ['/health', '/api/status', '/api/pair']
+  });
+});
 
 app.get('/health', (_req, res) => {
-  res.json({ success: true, status, uptime: process.uptime() })
-})
+  res.json({ ok: true, service: 'damar-api' });
+});
 
 app.get('/api/status', (_req, res) => {
   res.json({
-    success: true,
-    bot: BOT_NAME,
-    status,
-    connected: status === 'connected',
-    registered: Boolean(authState?.creds?.registered),
-    lastNumber,
-    lastError
-  })
-})
+    ok: true,
+    service: 'DAMAR-MD API',
+    pairing: 'available'
+  });
+});
 
-app.get('/api/pair', async (req, res) => {
-  try {
-    const result = await requestCode(req.query.number)
-    res.json({
-      success: true,
-      number: result.number,
-      code: result.code,
-      status,
-      message: 'دخل الكود في واتساب > الأجهزة المرتبطة > ربط جهاز'
-    })
-  } catch (error) {
-    console.error('Pairing request failed:', error)
-    res.status(400).json({
-      success: false,
-      error: error.message || 'Pairing request failed',
-      status,
-      lastError
-    })
-  }
-})
-
+/*
+ * طلب كود ربط واتساب.
+ * لا ترسل الكود إلى أي جهة أخرى؛ يظهر لصاحب الطلب فقط.
+ */
 app.post('/api/pair', async (req, res) => {
-  try {
-    const result = await requestCode(req.body?.number)
-    res.json({
-      success: true,
-      number: result.number,
-      code: result.code,
-      status,
-      message: 'دخل الكود في واتساب > الأجهزة المرتبطة > ربط جهاز'
-    })
-  } catch (error) {
-    console.error('Pairing request failed:', error)
-    res.status(400).json({
-      success: false,
-      error: error.message || 'Pairing request failed',
-      status,
-      lastError
-    })
+  const number = normalizeNumber(req.body?.number);
+
+  if (!validNumber(number)) {
+    return res.status(400).json({
+      ok: false,
+      error: 'دخل رقم واتساب صحيح مع مفتاح الدولة، بلا + أو مسافات.'
+    });
   }
-})
 
-app.use((error, _req, res, _next) => {
-  console.error('HTTP error:', error)
-  res.status(500).json({ success: false, error: 'Internal server error' })
-})
+  if (activeRequests.has(number)) {
+    return res.status(429).json({
+      ok: false,
+      error: 'كاين طلب ديال هاد الرقم خدام دابا. تسنى شوية.'
+    });
+  }
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`${BOT_NAME} API listening on port ${PORT}`)
-  console.log(`Auth directory: ${AUTH_DIR}`)
-})
+  const now = Date.now();
+  const lastRequest = lastRequests.get(number) || 0;
 
-startWhatsApp().catch(error => {
-  status = 'error'
-  lastError = { message: error.message }
-  console.error('WhatsApp startup failed:', error)
-  scheduleReconnect()
-})
+  if (now - lastRequest < 30000) {
+    return res.status(429).json({
+      ok: false,
+      error: 'تسنى 30 ثانية قبل ما تعاود تطلب كود جديد.'
+    });
+  }
 
-async function shutdown() {
-  clearTimeout(reconnectTimer)
-  server.close()
+  activeRequests.set(number, true);
+  lastRequests.set(number, now);
+
+  let sock;
+
   try {
-    if (sock) sock.end()
-  } catch {}
-  process.exit(0)
-}
+    const sessionDir = path.join(sessionsDir, number);
+    await fs.mkdir(sessionDir, { recursive: true });
 
-process.on('SIGTERM', shutdown)
-process.on('SIGINT', shutdown)
+    const { state, saveCreds } =
+      await useMultiFileAuthState(sessionDir);
+
+    if (state.creds.registered) {
+      return res.status(409).json({
+        ok: false,
+        registered: true,
+        error: 'هاد الرقم راه مربوط من قبل. ما محتاجش كود جديد.'
+      });
+    }
+
+    sock = makeWASocket({
+      auth: state,
+      logger,
+      browser: Browsers?.ubuntu
+        ? Browsers.ubuntu('Chrome')
+        : ['DAMAR-MD', 'Chrome', '1.0.0'],
+      printQRInTerminal: false,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
+      keepAliveIntervalMs: 15000,
+      markOnlineOnConnect: false,
+      syncFullHistory: false
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+
+    /*
+     * نعطيو المكتبة وقت قصير لبدء الاتصال.
+     */
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    if (sock.ws?.readyState === 3) {
+      throw new Error('اتصال واتساب تسد قبل ما يتولد الكود.');
+    }
+
+    const code = await sock.requestPairingCode(number);
+
+    if (!code || typeof code !== 'string') {
+      throw new Error('Baileys ما رجعاتش كود صالح.');
+    }
+
+    return res.json({
+      ok: true,
+      code,
+      message: 'تم إنشاء كود الربط. دخلو في واتساب ديالك.'
+    });
+
+  } catch (error) {
+    console.error(
+      'Pairing error:',
+      error?.stack || error?.message || error
+    );
+
+    /*
+     * ما نكشفوش تفاصيل داخلية حساسة للمتصفح.
+     */
+    return res.status(500).json({
+      ok: false,
+      error:
+        'ما قدرناش نولدو كود الربط. راجع Railway Deploy Logs.'
+    });
+
+  } finally {
+    activeRequests.delete(number);
+
+    /*
+     * ما نسدوش socket مباشرة بعد إصدار الكود؛
+     * الاتصال ضروري لإكمال عملية الربط.
+     */
+  }
+});
+
+/*
+ * منع أخطاء JSON غير الصالح من إسقاط السيرفر.
+ */
+app.use((error, _req, res, _next) => {
+  console.error('HTTP error:', error.message);
+
+  res.status(error.status || 400).json({
+    ok: false,
+    error: 'الطلب غير صالح.'
+  });
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`DAMAR-MD API listening on port ${PORT}`);
+});
