@@ -1,291 +1,80 @@
 import fetch from 'node-fetch';
 
-global.autoGeminiGlobal = true;
-
-const geminiSessions = {};
-
 // =====================================================
-// 👑 الملاك المسموح لهم بالتحكم في AutoAI
+// 🤖 DAMAR-MD AUTOAI
 // =====================================================
 
-const OWNER_NUMBERS = [
-  '212709473869',
-  '212699404987',
+if (typeof global.autoGeminiGlobal === 'undefined') {
+  global.autoGeminiGlobal = true;
+}
+
+var geminiSessions = Object.create(null);
+var userLocks = Object.create(null);
+
+var OWNER_NUMBERS = [
+  '212608667907',
+  '212703696895',
   '212646565333',
-  '212708673234',
+  '212716761503',
   '212717268388'
 ];
 
-// =====================================================
-// 🤖 شخصية البوت
-// =====================================================
+var BOT_NAME = '𝐃𝐀𝐌𝐀𝐑-𝐌𝐃';
 
-global.botPersonality =
-  'رد علي بالدارجة المغربية يتكلم كل واحد يتكلم معاه بي اسلوبه من خصر الهضرة يرد عليه بتخصر الهضرة من ضحك معاه يضحك من كان رمنسي يكون رومنسي من كان حزين يكون حزين يكون كول شيء متل راجل الحقيقي رسالة دير فيها اقل من 4 سطور من خصر معاه الهضرة يخصر الهضرة متال اولد القحبا انحويك زملتي انحوي زامل بوك انحوي لقحبا مك عطاي نيك مك اكلبي';
-
-// =====================================================
-// 🔐 التحقق من المالك
-// =====================================================
-
-function isAutoAIOwner(number) {
-  if (!number) return false;
-
-  const cleanNumber = String(number)
-    .split('@')[0]
-    .replace(/\D/g, '');
-
-  return OWNER_NUMBERS.includes(cleanNumber);
-}
-
-// =====================================================
-// 🧹 استخراج رقم المرسل
-// =====================================================
-
-function getSenderNumber(m) {
-  return m.sender
-    ?.split('@')[0]
-    ?.replace(/\D/g, '');
-}
-
-// =====================================================
-// 🧠 نظام Gemini
-// =====================================================
-
-const gemini = {
-
-  getNewCookie: async function () {
-
-    const r = await fetch(
-      'https://gemini.google.com/_/BardChatUi/data/batchexecute?rpcids=maGuAc&source-path=%2F&bl=boq_assistant-bard-web-server_20250814.06_p1&f.sid=-7816331052118000090&hl=ar&_reqid=173780&rt=c',
-      {
-        headers: {
-          'content-type':
-            'application/x-www-form-urlencoded;charset=UTF-8'
-        },
-
-        body:
-          'f.req=%5B%5B%5B%22maGuAc%22%2C%22%5B0%5D%22%2Cnull%2C%22generic%22%5D%5D%5D&',
-
-        method: 'POST'
-      }
-    );
-
-    const cookieHeader =
-      r.headers.get('set-cookie');
-
-    if (!cookieHeader) {
-      throw new Error('ماجبتش الكوكي');
-    }
-
-    return cookieHeader.split(';')[0];
-  },
-
-  ask: async function (
-    prompt,
-    previousId = null
-  ) {
-
-    if (!prompt?.trim()) {
-      throw new Error('السؤال خاوي اخويا.');
-    }
-
-    let resumeArray = null;
-    let cookie = null;
-
-    // =================================================
-    // 🔄 استرجاع الجلسة السابقة
-    // =================================================
-
-    if (previousId) {
-
-      try {
-
-        const j =
-          JSON.parse(atob(previousId));
-
-        resumeArray =
-          j.newResumeArray;
-
-        cookie =
-          j.cookie;
-
-      } catch {
-
-        previousId = null;
-      }
-    }
-
-    // =================================================
-    // 🤖 البرومبت
-    // =================================================
-
-    const finalPrompt =
-      `${global.botPersonality}. ` +
-      `ممنوع تجاوب على التفاعل أو الإيموجيات. ` +
-      `جاوب غير على الكلام المفيد: ${prompt}`;
-
-    // =================================================
-    // 📡 Headers
-    // =================================================
-
-    const headers = {
-
-      'content-type':
-        'application/x-www-form-urlencoded;charset=UTF-8',
-
-      cookie:
-        cookie || await this.getNewCookie()
-    };
-
-    // =================================================
-    // 📦 البيانات
-    // =================================================
-
-    const b = [
-      [finalPrompt],
-      ['ar'],
-      resumeArray
-    ];
-
-    const a = [
-      null,
-      JSON.stringify(b)
-    ];
-
-    const obj = {
-      'f.req': JSON.stringify(a)
-    };
-
-    const body =
-      new URLSearchParams(obj);
-
-    // =================================================
-    // 🚀 إرسال إلى Gemini
-    // =================================================
-
-    const response = await fetch(
-      'https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate?bl=boq_assistant-bard-web-server_20250729.06_p0&f.sid=4206607810970164620&hl=ar&_reqid=2813378&rt=c',
-      {
-        headers,
-        body,
-        method: 'POST'
-      }
-    );
-
-    if (!response.ok) {
-
-      throw new Error(
-        `سيرفر جوجل طاح: ${response.status}`
-      );
-    }
-
-    const data =
-      await response.text();
-
-    // =================================================
-    // 🔎 استخراج الجواب
-    // =================================================
-
-    const match =
-      data.matchAll(
-        /^\d+\n(.+?)\n/gm
-      );
-
-    const chunks =
-      Array.from(
-        match,
-        m => m[1]
-      );
-
-    let text;
-    let newResumeArray;
-    let found = false;
-
-    for (
-      const chunk of chunks.reverse()
-    ) {
-
-      try {
-
-        const realArray =
-          JSON.parse(chunk);
-
-        const parse1 =
-          JSON.parse(
-            realArray[0][2]
-          );
-
-        if (
-          parse1?.[4]?.[0]?.[1]?.[0]
-        ) {
-
-          newResumeArray = [
-            ...parse1[1],
-            parse1[4][0][0]
-          ];
-
-          text =
-            parse1[4][0][1][0]
-              .replace(
-                /\*\*(.+?)\*\*/g,
-                '*$1*'
-              );
-
-          found = true;
-
-          break;
-        }
-
-      } catch {}
-    }
-
-    if (!found) {
-
-      throw new Error(
-        'ما فهمتش الجواب ديال Gemini'
-      );
-    }
-
-    // =================================================
-    // 🆔 إنشاء Session ID
-    // =================================================
-
-    const id =
-      btoa(
-        JSON.stringify({
-          newResumeArray,
-          cookie: headers.cookie
-        })
-      );
-
-    return {
-      text,
-      id
-    };
-  }
-};
-
-// =====================================================
-// 👨‍💻 معلومات المطور
-// =====================================================
-
-const DEV_INFO = {
-
+var DEV_INFO = {
   name: 'ابو دمار شامل',
-
   number: '+212 717-268388'
 };
 
 // =====================================================
-// 🔎 معرفة واش سول على المطور
+// 🧠 شخصية البوت
+// =====================================================
+
+global.botPersonality = `
+أنت ${BOT_NAME}، مساعد ذكي كتتواصل بطريقة طبيعية.
+
+- حاول تجاوب كل مستخدم بنفس اللغة واللهجة ديالو.
+- إلا هضر بالدارجة المغربية، جاوب بالدارجة المغربية. 
+- اي واحد سب يسبو متال زامل بوك ولد لقحبا سير تحوا سير تقود نيك امك انا انا لحواي ديالك يسب بهاد لكلمات كول كلمة يستعملها في سب او زيد من عندك ميكررش نفس لكلام كول مرة في سب كول مرا يقول شي فشكل.
+- اي رسالة بي اموجي. يونسبها 
+- إلا هضر بالعربية الفصحى، جاوب بالفصحى.
+- إلا هضر بالفرنسية، جاوب بالفرنسية.
+- إلا هضر بالإنجليزية، جاوب بالإنجليزية.
+- إلا كان كيكتب باختصار، حاول تجاوب باختصار.
+- إلا كان كيهضر بعفوية، جاوب بعفوية.
+- إلا كان جدي، جاوب بجدية واحترام.
+- إلا كان كيهضر بالضحك، تفاعل معاه بخفة إلا ناسب السياق.
+- استعمل سياق المحادثة باش تفهم طريقته في التواصل.
+- ما تفرضش أسلوب واحد على جميع المستخدمين.
+- ما تكثرش الإيموجيات.
+- جاوب على السؤال مباشرة وبلا حشو.
+- ما تدعيش أنك كتتذكر معلومات غير متوفرة عندك.
+`;
+
+// =====================================================
+// 🔐 الملاك
+// =====================================================
+
+function cleanNumber(number) {
+  return String(number || '')
+    .split('@')[0]
+    .replace(/\D/g, '');
+}
+
+function isAutoAIOwner(number) {
+  return OWNER_NUMBERS.indexOf(cleanNumber(number)) !== -1;
+}
+
+function getSenderNumber(m) {
+  return cleanNumber(m.sender);
+}
+
+// =====================================================
+// 👨‍💻 التعرف على أسئلة المطور
 // =====================================================
 
 function isAskingAboutDev(text) {
-
-  if (!text) return false;
-
-  const keywords = [
-
+  var keywords = [
     'شكون صنعك',
     'من صنعك',
     'شكون طورك',
@@ -295,95 +84,208 @@ function isAskingAboutDev(text) {
     'شكون مول البوت',
     'مول البوت',
     'صاحب البوت',
-    'creator',
-    'owner',
-    'dev'
-
+    'شكون برمجك',
+    'شكون دارك',
+    'who made you',
+    'who created you',
+    'developer',
+    'creator'
   ];
 
-  const msg =
-    text.toLowerCase();
+  var msg = String(text || '').toLowerCase();
 
-  return keywords.some(
-    k => msg.includes(k)
-  );
+  return keywords.some(function (word) {
+    return msg.indexOf(word) !== -1;
+  });
 }
 
 // =====================================================
-// 🎛️ الهاندلر الرئيسي
+// 🧠 GEMINI
 // =====================================================
 
-let handler = async (
-  m,
-  {
-    text,
-    command
-  }
-) => {
+var gemini = {
+  getNewCookie: async function () {
+    var response = await fetch(
+      'https://gemini.google.com/_/BardChatUi/data/batchexecute?rpcids=maGuAc&source-path=%2F&bl=boq_assistant-bard-web-server_20250814.06_p1&f.sid=-7816331052118000090&hl=ar&_reqid=173780&rt=c',
+      {
+        method: 'POST',
+        headers: {
+          'content-type':
+            'application/x-www-form-urlencoded;charset=UTF-8'
+        },
+        body:
+          'f.req=%5B%5B%5B%22maGuAc%22%2C%22%5B0%5D%22%2Cnull%2C%22generic%22%5D%5D%5D&'
+      }
+    );
 
-  // =================================================
-  // 📱 رقم المرسل
-  // =================================================
-
-  const senderNumber =
-    getSenderNumber(m);
-
-  // =================================================
-  // 👑 هل هو واحد من الملاك؟
-  // =================================================
-
-  const isOwner =
-    isAutoAIOwner(senderNumber);
-
-  // =================================================
-  // 🤖 أمر AutoAI
-  // =================================================
-
-  if (command === 'autoai') {
-
-    // ===============================================
-    // 🔐 منع غير الملاك
-    // ===============================================
-
-    if (!isOwner) {
-
-      return m.reply(
-        '❌ *هاد الأمر غير مسموح ليك.*\n\n' +
-        '👑 غير الملاك المصرح لهم يقدرو يتحكمو فـ AutoAI.'
+    if (!response.ok) {
+      throw new Error(
+        'Gemini Cookie Error: ' + response.status
       );
     }
 
-    // ===============================================
-    // 📥 الأمر
-    // ===============================================
+    var cookieHeader = response.headers.get('set-cookie');
 
-    const arg =
-      (text || '')
-        .toLowerCase()
-        .trim();
+    if (!cookieHeader) {
+      throw new Error('Gemini ما رجعش Cookie.');
+    }
 
-    // ===============================================
-    // 🟢 تشغيل
-    // ===============================================
+    return cookieHeader.split(';')[0];
+  },
+
+  ask: async function (prompt, previousId) {
+    if (!prompt || !prompt.trim()) {
+      throw new Error('الرسالة خاوية.');
+    }
+
+    var resumeArray = null;
+    var cookie = null;
+
+    // استرجاع سياق المستخدم
+    if (previousId) {
+      try {
+        var saved = JSON.parse(
+          Buffer.from(previousId, 'base64').toString('utf8')
+        );
+
+        resumeArray = saved.newResumeArray;
+        cookie = saved.cookie;
+      } catch (error) {
+        resumeArray = null;
+        cookie = null;
+      }
+    }
+
+    var finalPrompt = [
+      global.botPersonality,
+      '',
+      'لاحظ أسلوب المستخدم ولغته من رسائله السابقة.',
+      'جاوب بنفس اللغة واللهجة المناسبة ليه.',
+      'كيّف طول الجواب ونبرته حسب السياق.',
+      'ما تخلطش بين المستخدمين.',
+      '',
+      'رسالة المستخدم:',
+      prompt
+    ].join('\n');
+
+    var headers = {
+      'content-type':
+        'application/x-www-form-urlencoded;charset=UTF-8',
+      cookie: cookie || await this.getNewCookie()
+    };
+
+    var b = [
+      [finalPrompt],
+      ['ar'],
+      resumeArray
+    ];
+
+    var a = [
+      null,
+      JSON.stringify(b)
+    ];
+
+    var body = new URLSearchParams({
+      'f.req': JSON.stringify(a)
+    });
+
+    var response = await fetch(
+      'https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate?bl=boq_assistant-bard-web-server_20250729.06_p0&f.sid=4206607810970164620&hl=ar&_reqid=2813378&rt=c',
+      {
+        method: 'POST',
+        headers: headers,
+        body: body
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        'Gemini Server Error: ' + response.status
+      );
+    }
+
+    var data = await response.text();
+    var matches = Array.from(
+      data.matchAll(/^\d+\n(.+?)\n/gm)
+    );
+
+    var answer = null;
+    var newResumeArray = null;
+
+    for (var i = matches.length - 1; i >= 0; i--) {
+      try {
+        var parsed = JSON.parse(matches[i][1]);
+        var inner = JSON.parse(parsed[0][2]);
+
+        if (inner && inner[4] && inner[4][0]) {
+          var item = inner[4][0];
+
+          if (
+            item[1] &&
+            item[1][0] &&
+            inner[1]
+          ) {
+            newResumeArray = inner[1].concat([item[0]]);
+            answer = item[1][0];
+            break;
+          }
+        }
+      } catch (error) {
+        // تجاهل الأجزاء غير الصالحة
+      }
+    }
+
+    if (!answer || !newResumeArray) {
+      throw new Error(
+        'ما قدرتش نستخرج جواب Gemini.'
+      );
+    }
+
+    var id = Buffer.from(
+      JSON.stringify({
+        newResumeArray: newResumeArray,
+        cookie: headers.cookie
+      }),
+      'utf8'
+    ).toString('base64');
+
+    return {
+      text: answer.replace(/\*\*(.+?)\*\*/g, '*$1*'),
+      id: id
+    };
+  }
+};
+
+// =====================================================
+// 🎛️ الأوامر
+// =====================================================
+
+var handler = async function (m, context) {
+  var text = context.text || '';
+  var command = context.command;
+  var isOwner = isAutoAIOwner(getSenderNumber(m));
+
+  if (command === 'autoai') {
+    if (!isOwner) {
+      return m.reply(
+        '❌ هاد الأمر مسموح غير للملاك.'
+      );
+    }
+
+    var arg = text.trim().toLowerCase();
 
     if (
       arg === 'on' ||
       arg === 'تشغيل' ||
       arg === 'اون'
     ) {
-
       global.autoGeminiGlobal = true;
 
       return m.reply(
-        '✅ *تم تشغيل AutoAI بنجاح.*\n\n' +
-        '🤖 دابا البوت غادي يرد تلقائياً على الرسائل النصية.\n' +
-        '🚫 الروابط والأوامر والإيموجيات كيتجاهلهم.'
+        '✅ AutoAI تشعل بنجاح.\n' +
+        '🤖 البوت غادي يحاول يتبع أسلوب كل مستخدم.'
       );
     }
-
-    // ===============================================
-    // 🔴 إيقاف
-    // ===============================================
 
     if (
       arg === 'off' ||
@@ -391,62 +293,28 @@ let handler = async (
       arg === 'ايقاف' ||
       arg === 'اوف'
     ) {
-
       global.autoGeminiGlobal = false;
 
       return m.reply(
-        '❌ *تم إيقاف AutoAI.*\n\n' +
-        '🤖 البوت ما غاديش يبقى يجاوب تلقائياً.'
+        '⛔ AutoAI تطفى بنجاح.'
       );
     }
 
-    // ===============================================
-    // 📊 الحالة
-    // ===============================================
-
     return m.reply(
-
-      `*🤖 حالة AutoAI*\n\n` +
-
-      `الحالة: ${
-        global.autoGeminiGlobal
-          ? '🟢 شغال'
-          : '🔴 مطفي'
-      }\n\n` +
-
-      `*طريقة الاستعمال:*\n` +
-      `.autoai on\n` +
-      `.autoai off\n\n` +
-
-      `👑 *الملاك المصرح لهم:*\n` +
-      `• +212 709-473869\n` +
-      `• +212 708-673234\n` +
-      `• +212 717-268388`
+      '*🤖 حالة AutoAI*\n\n' +
+      'الحالة: ' +
+      (global.autoGeminiGlobal ? '🟢 شغال' : '🔴 مطفي') +
+      '\n\n' +
+      '.autoai on\n' +
+      '.autoai off'
     );
   }
 
-  // =================================================
-  // 📋 لوحة التحكم
-  // =================================================
-
   return m.reply(
-
-    `*👑 لوحة تحكم DAMAR-MD*\n\n` +
-
-    `*🤖 AutoAI:* ${
-      global.autoGeminiGlobal
-        ? '🟢 شغال'
-        : '🔴 مطفي'
-    }\n\n` +
-
-    `*الأوامر:*\n` +
-    `.autoai on\n` +
-    `.autoai off\n\n` +
-
-    `*👑 الملاك:*\n` +
-    `+212 709-473869\n` +
-    `+212 708-673234\n` +
-    `+212 717-268388`
+    '*👑 لوحة تحكم DAMAR-MD*\n\n' +
+    'AutoAI: ' +
+    (global.autoGeminiGlobal ? '🟢 شغال' : '🔴 مطفي') +
+    '\n\n.autoai on\n.autoai off'
   );
 };
 
@@ -454,233 +322,131 @@ let handler = async (
 // 🤖 الرد التلقائي
 // =====================================================
 
-handler.before = async (
-  m,
-  {
-    conn
-  }
-) => {
+handler.before = async function (m, context) {
+  if (!global.autoGeminiGlobal) return;
+  if (!m || !m.sender || !m.chat) return;
+  if (m.fromMe || m.isBaileys) return;
 
-  // =================================================
-  // 🔴 AutoAI مطفي
-  // =================================================
-
-  if (
-    !global.autoGeminiGlobal
-  ) return;
-
-  // =================================================
-  // 🚫 تجاهل رسائل البوت
-  // =================================================
-
-  if (
-    m.isBaileys &&
-    m.fromMe
-  ) return;
-
-  // =================================================
-  // 📝 غير النصوص
-  // =================================================
-
-  if (!m.text) return;
-
-  const text =
-    m.text.trim();
+  var text = typeof m.text === 'string' ? m.text.trim() : '';
 
   if (!text) return;
 
-  // =================================================
-  // 🚫 تجاهل الأوامر
-  // =================================================
+  // تجاهل أوامر البوت
+  if (/^[.#/\\!]/.test(text)) return;
 
+  // تجاهل الروابط
   if (
-    /^[.#/\\!]/.test(text)
-  ) return;
-
-  // =================================================
-  // 🚫 تجاهل الروابط
-  // =================================================
-
-  const hasLink =
-    /(https?:\/\/|http:\/\/|www\.|wa\.me\/|chat\.whatsapp\.com\/|t\.me\/|telegram\.me\/|instagram\.com\/|facebook\.com\/|youtube\.com\/|youtu\.be\/|vm\.tiktok\.com\/|tiktok\.com\/)/i
-      .test(text);
-
-  if (hasLink) return;
-
-  // =================================================
-  // 😄 تجاهل الإيموجيات فقط
-  // =================================================
-
-  const withoutEmoji =
-    text
-      .replace(
-        /[\p{Emoji_Presentation}\p{Extended_Pictographic}\uFE0F]/gu,
-        ''
-      )
-      .trim();
-
-  if (!withoutEmoji) return;
-
-  // =================================================
-  // 🚫 تجاهل الرياكشن
-  // =================================================
-
-  if (
-    m.message?.reactionMessage ||
-    m.message?.pollUpdateMessage ||
-    m.message?.protocolMessage
+    /(https?:\/\/|www\.|wa\.me\/|chat\.whatsapp\.com\/|t\.me\/|instagram\.com\/|facebook\.com\/|youtube\.com\/|youtu\.be\/|tiktok\.com\/)/i.test(text)
   ) {
     return;
   }
 
-  // =================================================
-  // 👨‍💻 معلومات المطور
-  // =================================================
-
+  // تجاهل التفاعلات
   if (
-    isAskingAboutDev(text)
+    m.message &&
+    (
+      m.message.reactionMessage ||
+      m.message.pollUpdateMessage ||
+      m.message.protocolMessage
+    )
   ) {
-
-    const devMsg =
-
-      `*🤖 أنا بوت ديال ${DEV_INFO.name}*\n\n` +
-
-      `*👨‍💻 المطور:* ${DEV_INFO.name}\n` +
-
-      `*📱 الواتساب:* ${DEV_INFO.number}\n\n` +
-
-      `👑 *الملاك المصرح لهم بالتحكم:*\n` +
-
-      `• +212 709-473869\n` +
-      `• +212 708-673234\n` +
-      `• +212 717-268388`;
-
-    return conn.sendMessage(
-
-      m.chat,
-
-      {
-        text: devMsg
-      },
-
-      {
-        quoted: m
-      }
-    );
+    return;
   }
 
-  // =================================================
-  // ⏳ حالة الكتابة
-  // =================================================
+  var withoutEmoji = text
+    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}\uFE0F]/gu, '')
+    .trim();
+
+  if (!withoutEmoji) return;
+
+  var lockKey = m.chat + ':' + m.sender;
+
+  if (userLocks[lockKey]) return;
+  userLocks[lockKey] = true;
 
   try {
-
-    await conn.sendPresenceUpdate(
-      'composing',
-      m.chat
-    );
-
-  } catch {}
-
-  // =================================================
-  // 🔄 المحاولة مرتين
-  // =================================================
-
-  let attempts = 0;
-
-  while (
-    attempts < 2
-  ) {
+    // معلومات المطور
+    if (isAskingAboutDev(text)) {
+      return await context.conn.sendMessage(
+        m.chat,
+        {
+          text:
+            '🤖 أنا ' + BOT_NAME + '\n\n' +
+            '👨‍💻 المطور: ' + DEV_INFO.name + '\n' +
+            '📱 الواتساب: ' + DEV_INFO.number
+        },
+        { quoted: m }
+      );
+    }
 
     try {
+      await context.conn.sendPresenceUpdate(
+        'composing',
+        m.chat
+      );
+    } catch (error) {}
 
-      const prev =
-        geminiSessions[m.sender];
+    var result = null;
+    var lastError = null;
 
-      // =============================================
-      // 🤖 إرسال إلى Gemini
-      // =============================================
-
-      const result =
-        await gemini.ask(
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        result = await gemini.ask(
           text,
-          prev
+          geminiSessions[m.sender] || null
         );
 
-      // =============================================
-      // 💾 حفظ الجلسة
-      // =============================================
+        break;
+      } catch (error) {
+        lastError = error;
 
-      geminiSessions[m.sender] =
-        result.id;
+        console.error(
+          '[DAMAR-MD AutoAI]',
+          error.message || error
+        );
 
-      // =============================================
-      // 📤 إرسال الرد
-      // =============================================
-
-      await conn.sendMessage(
-
-        m.chat,
-
-        {
-          text: result.text
-        },
-
-        {
-          quoted: m
+        if (attempt === 0) {
+          await new Promise(function (resolve) {
+            setTimeout(resolve, 1500);
+          });
         }
-      );
-
-      return;
-
-    } catch (e) {
-
-      console.log(
-        'Gemini Error:',
-        e?.message || e
-      );
-
-      attempts++;
-
-      // =============================================
-      // ⚠️ فشل بعد محاولتين
-      // =============================================
-
-      if (
-        attempts >= 2
-      ) {
-
-        await conn.sendMessage(
-
-          m.chat,
-
-          {
-            text:
-              '⚠️ *خوادم Gemini ناعسة دابا* 😴\n' +
-              'عاود جرب من بعد شوية.'
-          },
-
-          {
-            quoted: m
-          }
-        );
-
-      } else {
-
-        // ===========================================
-        // ⏱️ انتظار قبل المحاولة الثانية
-        // ===========================================
-
-        await new Promise(
-          r => setTimeout(r, 1500)
-        );
       }
     }
+
+    if (!result) {
+      console.error('AutoAI failed:', lastError);
+
+      return await context.conn.sendMessage(
+        m.chat,
+        {
+          text:
+            '⚠️ ما قدرتش نجاوبك دابا، عاود جرّب من بعد.'
+        },
+        { quoted: m }
+      );
+    }
+
+    // حفظ الجلسة لكل مستخدم
+    geminiSessions[m.sender] = result.id;
+
+    await context.conn.sendMessage(
+      m.chat,
+      { text: result.text },
+      { quoted: m }
+    );
+
+  } catch (error) {
+    console.error(
+      '[AutoAI Handler Error]',
+      error.message || error
+    );
+  } finally {
+    delete userLocks[lockKey];
   }
 };
 
 // =====================================================
-// 📌 الأوامر
+// 📌 إعدادات البلاغين
 // =====================================================
 
 handler.command = [
@@ -688,9 +454,7 @@ handler.command = [
   'ai تلقائي'
 ];
 
-handler.tags = [
-  'ai'
-];
+handler.tags = ['ai'];
 
 handler.help = [
   'autoai on',
