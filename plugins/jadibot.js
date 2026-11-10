@@ -1,279 +1,966 @@
-// plugins/serbot.js — JadiBot / SerBot (تنصيب بوت فرعي)
-// كيخلي أي مستعمل يربط الرقم ديالو مع البوت الرئيسي بكود الربط (pairing code)،
-// وكيولي الرقم ديالو بوت فرعي كيخدم بنفس البلاغينات، بلا سيرفر بوحدو.
-//
-// الأوامر:
-//   .serbot                 ربط رقمك (أو .serbot 2126XXXXXXXX لرقم آخر)
-//   .jadibot                نفس الشي
-//   .stopserbot             إيقاف البوت الفرعي ديالك (الجلسة كتبقى محفوظة)
-//   .delserbot              حذف البوت الفرعي نهائيا (تسجيل الخروج + مسح الجلسة)
-//   .listbots               (للمالك) لائحة البوتات الفرعية المتصلة
-//
-// الجلسات كتحفظ فمجلد serbot/<phone> فجذر البوت. من بعد إعادة تشغيل البوت
-// الرئيسي، المستعمل كيعاود .serbot وكيتربط مباشرة بلا كود جديد.
-//
-// ملاحظة تقنية: من بعد إدخال كود الربط، واتساب كيسد الاتصال بـ 515
-// (restartRequired) وخاص إعادة الربط بنفس الجلسة — هادا سلوك عادي ومقصود هنا.
 
-import { useMultiFileAuthState, makeCacheableSignalKeyStore, fetchLatestWaWebVersion, Browsers, DisconnectReason } from 'baileys'
+// ======================================================
+// 🇲🇦 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃 | JADIBOT SYSTEM V2
+// Developer: أبو دمار شامل
+// ======================================================
+
+import {
+    useMultiFileAuthState,
+    makeCacheableSignalKeyStore,
+    fetchLatestWaWebVersion,
+    Browsers,
+    DisconnectReason
+} from 'baileys'
+
 import { makeWASocket } from '../lib/simple.js'
-import { handler as mainHandler, participantsUpdate, groupsUpdate } from '../handler.js'
+
+import {
+    handler as mainHandler,
+    participantsUpdate,
+    groupsUpdate
+} from '../handler.js'
+
 import pino from 'pino'
 import fs from 'node:fs'
 import path from 'node:path'
 
 const MAX_SERBOTS = 10
 const BASE_DIR = path.join(process.cwd(), 'serbot')
-if (!globalThis.__serbots) globalThis.__serbots = new Map()
-const registry = globalThis.__serbots // phone -> entry
+
+const PIC = 'https://cdn.zass.in/9gr2ADAc8B.jpeg'
+
+const FACEBOOK =
+    'https://www.facebook.com/profile.php?id=61591783185803'
+
 const logger = pino({ level: 'silent' })
 
-const digits = (s) => String(s || '').replace(/[^0-9]/g, '')
-const userJid = (phone) => `${phone}@s.whatsapp.net`
+if (!globalThis.__serbots) {
+    globalThis.__serbots = new Map()
+}
 
-// مجموعات ممنوعة على البوتات الفرعية (فيها البوت الرئيسي — بلا ازدواجية فالردود)
-// قابلة للتعديل بالأوامر .blockserbot / .unblockserbot (للمالك)، وكتحفظ فالداتابيز
-const DEFAULT_BLOCKED_GROUPS = ['120363409475224628@g.us']
+const registry = globalThis.__serbots
+
+const digits = (s) =>
+    String(s || '').replace(/[^0-9]/g, '')
+
+const userJid = (phone) =>
+    `${phone}@s.whatsapp.net`
+
+// ======================================================
+// 🔒 أوامر المالك الرئيسي الممنوعة على البوتات الفرعية
+// ======================================================
+
+const OWNER_ONLY_COMMANDS = [
+    'sfp',
+    'deleteplugin',
+    'getplugin',
+    'restart',
+    'shutdown',
+    'addowner',
+    'delowner',
+    'addprem',
+    'delprem',
+    'listbots',
+    'blockserbot',
+    'unblockserbot',
+    'clearcache',
+    'cleartmp',
+    'exec',
+    'eval'
+]
+
+function getMessageText(msg) {
+    let m = msg?.message || {}
+
+    while (
+        m.ephemeralMessage ||
+        m.viewOnceMessage ||
+        m.viewOnceMessageV2 ||
+        m.documentWithCaptionMessage
+    ) {
+        m =
+            m.ephemeralMessage?.message ||
+            m.viewOnceMessage?.message ||
+            m.viewOnceMessageV2?.message ||
+            m.documentWithCaptionMessage?.message ||
+            m
+    }
+
+    return (
+        m.conversation ||
+        m.extendedTextMessage?.text ||
+        m.imageMessage?.caption ||
+        m.videoMessage?.caption ||
+        m.documentMessage?.caption ||
+        ''
+    )
+}
+
+function isProtectedCommand(text) {
+    const match = String(text || '')
+        .trim()
+        .match(/^[.!#/،]([^\s]+)/)
+
+    if (!match) return false
+
+    const command = match[1].toLowerCase()
+
+    if (OWNER_ONLY_COMMANDS.includes(command)) {
+        return true
+    }
+
+    for (const plugin of Object.values(global.plugins || {})) {
+        if (!plugin) continue
+
+        const helps = Array.isArray(plugin.help)
+            ? plugin.help
+            : plugin.help
+                ? [plugin.help]
+                : []
+
+        const aliases = helps.map(x =>
+            String(x)
+                .replace(/^[.!#/،]/, '')
+                .toLowerCase()
+        )
+
+        if (
+            aliases.includes(command) &&
+            (
+                plugin.owner === true ||
+                plugin.rowner === true
+            )
+        ) {
+            return true
+        }
+    }
+
+    return false
+}
+
+// ======================================================
+// 🚫 المجموعات المحظورة
+// ======================================================
+
+const DEFAULT_BLOCKED_GROUPS = [
+    '120363409475224628@g.us'
+]
+
 function blockedGroups() {
     try {
-        const saved = globalThis.db?.data?.settings?.serbotBlocked
+        const saved =
+            globalThis.db?.data?.settings?.serbotBlocked
+
         if (Array.isArray(saved)) return saved
     } catch {}
+
     return DEFAULT_BLOCKED_GROUPS
 }
+
 function saveBlockedGroups(list) {
     try {
-        globalThis.db.data.settings = globalThis.db.data.settings || {}
-        globalThis.db.data.settings.serbotBlocked = [...new Set(list)]
+        globalThis.db.data.settings =
+            globalThis.db.data.settings || {}
+
+        globalThis.db.data.settings.serbotBlocked =
+            [...new Set(list)]
+
         return true
-    } catch { return false }
+    } catch {
+        return false
+    }
 }
+
+// ======================================================
+// 📱 تحديد الرقم
+// ======================================================
 
 function senderPhone(m, text) {
-    const fromText = digits((text || '').trim().split(/\s+/)[0])
-    if (fromText.length >= 9) return fromText
-    if (m?.sender?.endsWith('@s.whatsapp.net')) return digits(m.sender)
-    return '' // LID أو مجهول: خاص الرقم صراحة
+    const fromText = digits(
+        String(text || '').trim().split(/\s+/)[0]
+    )
+
+    if (fromText.length >= 9 && fromText.length <= 15) {
+        return fromText
+    }
+
+    if (m?.sender?.endsWith('@s.whatsapp.net')) {
+        return digits(m.sender)
+    }
+
+    return ''
 }
+
+// ======================================================
+// 📩 إرسال رسالة للخاص عند الحاجة
+// ======================================================
 
 async function notify(mainConn, phone, text) {
-    try { await mainConn.sendMessage(userJid(phone), { text }) } catch {}
+    try {
+        await mainConn.sendMessage(
+            userJid(phone),
+            { text }
+        )
+
+        return true
+    } catch (e) {
+        console.error('[JADIBOT PRIVATE NOTIFY]', e)
+        return false
+    }
 }
 
-// كينشئ (أو يعاود إنشاء) الصوكيت ديال واحد الـ entry موجود
+// ======================================================
+// 📢 إرسال إشعار داخل مجموعة التنصيب
+// ======================================================
+
+async function notifyInstallGroup(conn, entry, message) {
+    try {
+        const chat = entry.installChat
+
+        if (!chat || !chat.endsWith('@g.us')) {
+            console.error('[JADIBOT] Install group not found')
+            return false
+        }
+
+        await conn.sendMessage(chat, {
+            text: message
+        })
+
+        return true
+    } catch (e) {
+        console.error('[JADIBOT GROUP NOTIFY]', e)
+        return false
+    }
+}
+
+// ======================================================
+// 📋 بطاقة كود التنصيب
+// ======================================================
+
+async function sendPairingCard(conn, m, code) {
+    const caption = `
+╭━━━⪩ 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃 ⪨━━━⬣
+
+👑 مرحبا بك في نظام تنصيب البوت
+
+🔗 كود الربط ديالك:
+
+${code}
+
+📱 طريقة التنصيب في واتساب:
+
+1️⃣ افتح WhatsApp.
+2️⃣ ادخل إلى الإعدادات.
+3️⃣ اختر الأجهزة المرتبطة.
+4️⃣ اضغط على ربط جهاز.
+5️⃣ اختر الربط برقم الهاتف.
+6️⃣ انسخ الكود أعلاه.
+7️⃣ أدخل الكود في واتساب.
+
+⏳ الكود صالح لمدة قصيرة.
+
+━━━━━━━━━━━━━━━━
+
+👨‍💻 حساب المطور:
+أبو دمار شامل
+
+╰━━━━━━━━━━━━━━━━⬣
+
+© 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃
+`
+
+    const buttons = [
+        {
+            name: 'cta_copy',
+            buttonParamsJson: JSON.stringify({
+                display_text: '📋 نسخ كود الربط',
+                copy_code: code.replace(/-/g, '')
+            })
+        },
+        {
+            name: 'cta_url',
+            buttonParamsJson: JSON.stringify({
+                display_text: '👨‍💻 حساب المطور',
+                url: FACEBOOK
+            })
+        }
+    ]
+
+    if (typeof conn.sendButton === 'function') {
+        try {
+            return await conn.sendButton(
+                m.chat,
+                {
+                    image: { url: PIC },
+                    caption,
+                    footer: '𝐃𝐀𝐌𝐀𝐑-𝐌𝐃 | أبو دمار شامل',
+                    buttons
+                },
+                { quoted: m }
+            )
+        } catch (e) {
+            console.error('[JADIBOT BUTTON]', e?.message)
+        }
+    }
+
+    try {
+        await conn.sendMessage(
+            m.chat,
+            {
+                image: { url: PIC },
+                caption: caption + '\n\n📋 الكود للنسخ:\n' + code
+            },
+            { quoted: m }
+        )
+    } catch {
+        await m.reply(caption + '\n\n📋 ' + code)
+    }
+}
+
+// ======================================================
+// 🔌 إنشاء اتصال البوت الفرعي
+// ======================================================
+
 async function connectSocket(entry, mainConn) {
-    const { state, saveCreds } = await useMultiFileAuthState(entry.dir)
+    const { state, saveCreds } =
+        await useMultiFileAuthState(entry.dir)
+
     entry.registered = !!state.creds.registered
 
     let version
-    try { version = (await fetchLatestWaWebVersion()).version } catch {}
+
+    try {
+        version = (await fetchLatestWaWebVersion()).version
+    } catch (e) {
+        console.error('[JADIBOT VERSION]', e?.message)
+    }
 
     const sock = makeWASocket({
         ...(version ? { version } : {}),
         logger,
         printQRInTerminal: false,
-        auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
-        browser: Browsers?.ubuntu ? Browsers.ubuntu('Chrome') : ['SILANA SERBOT', 'Chrome', '1.0.0'],
+
+        auth: {
+            creds: state.creds,
+            keys: makeCacheableSignalKeyStore(
+                state.keys,
+                logger
+            )
+        },
+
+        browser: Browsers?.ubuntu
+            ? Browsers.ubuntu('Chrome')
+            : ['DAMAR-MD', 'Chrome', '1.0.0'],
+
         markOnlineOnConnect: false,
-        syncFullHistory: false,
+        syncFullHistory: false
     })
+
     sock.isSerbot = true
     sock.serbotPhone = entry.phone
+
     entry.sock = sock
 
-    // البوت الفرعي كيتجاهل تماما المجموعات المحظورة (فيها البوت الرئيسي)
-    sock.handler = (chatUpdate) => {
-        const msgs = (chatUpdate?.messages || []).filter((msg) => !blockedGroups().includes(msg?.key?.remoteJid || ''))
-        if (!msgs.length) return
-        return mainHandler.call(sock, { ...chatUpdate, messages: msgs })
+    // ==================================================
+    // 🔒 حماية أوامر المالك
+    // ==================================================
+
+    sock.handler = async (chatUpdate) => {
+        const messages = (
+            chatUpdate?.messages || []
+        ).filter(msg => {
+            const jid = msg?.key?.remoteJid || ''
+
+            if (blockedGroups().includes(jid)) {
+                return false
+            }
+
+            return true
+        })
+
+        if (!messages.length) return
+
+        const allowed = []
+
+        for (const msg of messages) {
+            const text = getMessageText(msg)
+
+            if (isProtectedCommand(text)) {
+                try {
+                    await sock.sendMessage(
+                        msg.key.remoteJid,
+                        {
+                            text:
+                                '⛔ هاد الأمر خاص بمالك البوت الرئيسي DAMAR-MD.\n' +
+                                '🤖 البوتات الفرعية ما عندهاش صلاحية استعماله.'
+                        },
+                        { quoted: msg }
+                    )
+                } catch {}
+
+                continue
+            }
+
+            allowed.push(msg)
+        }
+
+        if (!allowed.length) return
+
+        return mainHandler.call(
+            sock,
+            {
+                ...chatUpdate,
+                messages: allowed
+            }
+        )
     }
+
     sock.ev.on('messages.upsert', sock.handler)
-    sock.ev.on('group-participants.update', (upd) => {
-        if (blockedGroups().includes(upd?.id || '')) return
+
+    sock.ev.on('group-participants.update', upd => {
+        if (blockedGroups().includes(upd?.id || '')) {
+            return
+        }
+
         return participantsUpdate.call(sock, upd)
     })
-    sock.ev.on('groups.update', (updates) => {
-        const allowed = (updates || []).filter((u) => !blockedGroups().includes(u?.id || ''))
+
+    sock.ev.on('groups.update', updates => {
+        const allowed = (updates || []).filter(
+            u => !blockedGroups().includes(u?.id || '')
+        )
+
         if (!allowed.length) return
+
         return groupsUpdate.call(sock, allowed)
     })
+
     sock.ev.on('creds.update', saveCreds)
 
-    sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
-        if (connection === 'open') {
-            entry.wasOpen = true
-            entry.attempts = 0
-            if (!entry.openNotified) {
-                entry.openNotified = true
-                await notify(mainConn, entry.phone,
-                    '✅ *البوت الفرعي ديالك ولى خدام!*\n\n' +
-                    'الرقم ديالك دابا بوت: أي واحد يهضر معاه ويستعمل الأوامر كيجاوب بنفس مميزات سيلانا.\n' +
-                    '• `.stopserbot` — إيقاف مؤقت (من البوت الرئيسي)\n' +
-                    '• `.delserbot` — حذف نهائي')
-            }
-            return
-        }
-        if (connection !== 'close' || entry.stopping) return
+    // ==================================================
+    // 🔄 الاتصال وإعادة الربط
+    // ==================================================
 
-        const code = lastDisconnect?.error?.output?.statusCode
+    sock.ev.on(
+        'connection.update',
+        async ({ connection, lastDisconnect }) => {
 
-        // تسجيل خروج حقيقي لجلسة كانت خدامة: كنمسحو كلشي
-        if (code === DisconnectReason.loggedOut && entry.wasOpen) {
-            registry.delete(entry.phone)
-            fs.rmSync(entry.dir, { recursive: true, force: true })
-            await notify(mainConn, entry.phone, '⚠️ تم تسجيل خروج البوت الفرعي ديالك (من الهاتف أو من واتساب). عاود `.serbot` إلا بغيتي تربطو من جديد.')
-            return
-        }
+            if (connection === 'open') {
+                entry.wasOpen = true
+                entry.attempts = 0
 
-        // باقي الإغلاقات (515 ديال ما بعد الربط، 428، 408 وحتى 401 قبل أول فتح)
-        // كتعالج بإعادة الربط بنفس الجلسة — ماشي بالحذف
-        entry.attempts++
-        const cap = entry.wasOpen ? 5 : 3
-        if (entry.attempts > cap) {
-            registry.delete(entry.phone)
-            try { sock.end?.(undefined) } catch {}
-            await notify(mainConn, entry.phone, entry.wasOpen
-                ? '❌ البوت الفرعي توقف بعد محاولات إعادة ربط فاشلة. عاود `.serbot` لتشغيلو.'
-                : entry.registered
-                    ? `⚠️ الجلسة المحفوظة لهاد الرقم ما قدراتش تتصل — غالبا الربط الأول ما كملش حتى للنهاية. الحل: \`.delserbot ${entry.phone}\` ومن بعد \`.serbot ${entry.phone}\` وربط بكود جديد.`
-                    : '⌛ سالات مهلة الربط قبل ما يكمل التنصيب. عاود `.serbot` وخد كود جديد ودخلو بسرعة.')
-            return
-        }
-        entry.sock = null
-        const delay = entry.wasOpen ? 3000 * entry.attempts : 1000
-        entry.timer = setTimeout(async () => {
-            if (entry.stopping || registry.get(entry.phone) !== entry) return
-            try {
-                const res = await connectSocket(entry, mainConn)
-                if (res?.code) {
-                    await notify(mainConn, entry.phone,
-                        '🔗 *كود ربط جديد:*\n\n' +
-                        `*${res.code}*\n\n` +
-                        'دخلو دابا: واتساب ← الأجهزة المرتبطة ← ربط جهاز ← الربط برقم الهاتف.')
+                if (!entry.openNotified) {
+                    entry.openNotified = true
+
+                    // الإشعار يمشي لمجموعة التنصيب فقط
+                    await notifyInstallGroup(
+                        mainConn,
+                        entry,
+                        '╭━━━⪩ 𝐃𝐀𝐌𝐀𝐑-𝐌𝐃 ⪨━━━⬣\n\n' +
+                        '✅ تم ربط البوت الفرعي بنجاح!\n\n' +
+                        '🤖 البوت دابا خدام.\n' +
+                        '📱 رقم البوت: +' + entry.phone + '\n\n' +
+                        '⏸️ للإيقاف: .stopserbot\n' +
+                        '🗑️ للحذف: .delserbot\n\n' +
+                        '╰━━━━━━━━━━━━━━━━⬣'
+                    )
                 }
-            } catch (e) {
-                console.error('[SERBOT] reconnect failed:', e?.message || e)
+
+                return
             }
-        }, delay)
-    })
+
+            if (
+                connection !== 'close' ||
+                entry.stopping
+            ) return
+
+            const code =
+                lastDisconnect?.error?.output?.statusCode
+
+            if (
+                code === DisconnectReason.loggedOut &&
+                entry.wasOpen
+            ) {
+                registry.delete(entry.phone)
+
+                try {
+                    fs.rmSync(
+                        entry.dir,
+                        { recursive: true, force: true }
+                    )
+                } catch (e) {
+                    console.error('[JADIBOT REMOVE]', e)
+                }
+
+                await notify(
+                    mainConn,
+                    entry.phone,
+                    '⚠️ تم تسجيل خروج البوت الفرعي. استعمل .Jadibot للربط من جديد.'
+                )
+
+                return
+            }
+
+            entry.attempts++
+
+            const cap = entry.wasOpen ? 5 : 3
+
+            if (entry.attempts > cap) {
+                registry.delete(entry.phone)
+
+                try {
+                    sock.end?.(undefined)
+                } catch {}
+
+                await notify(
+                    mainConn,
+                    entry.phone,
+                    '❌ تعذر إعادة اتصال البوت الفرعي.\nاستعمل .Jadibot للمحاولة من جديد.'
+                )
+
+                return
+            }
+
+            entry.sock = null
+
+            const delay = entry.wasOpen
+                ? 3000 * entry.attempts
+                : 2000
+
+            entry.timer = setTimeout(async () => {
+                if (
+                    entry.stopping ||
+                    registry.get(entry.phone) !== entry
+                ) return
+
+                try {
+                    const res = await connectSocket(
+                        entry,
+                        mainConn
+                    )
+
+                    if (res?.code) {
+                        await notify(
+                            mainConn,
+                            entry.phone,
+                            '🔗 كود ربط جديد:\n\n' +
+                            res.code +
+                            '\n\nأدخله في الأجهزة المرتبطة.'
+                        )
+                    }
+                } catch (e) {
+                    console.error(
+                        '[JADIBOT RECONNECT]',
+                        e?.message || e
+                    )
+                }
+            }, delay)
+        }
+    )
+
+    // ==================================================
+    // 🔑 طلب كود الربط
+    // ==================================================
 
     if (!state.creds.registered) {
-        // كنخليو الصوكيت يبدا الاتصال قبل طلب الكود
-        await new Promise((r) => setTimeout(r, 2500))
-        let code
-        try { code = await sock.requestPairingCode(entry.phone) }
-        catch { await new Promise((r) => setTimeout(r, 3000)); code = await sock.requestPairingCode(entry.phone) }
-        return { code: String(code || '').match(/.{1,4}/g)?.join('-') || String(code || '') }
+        await new Promise(resolve =>
+            setTimeout(resolve, 2500)
+        )
+
+        let pairingCode
+
+        try {
+            pairingCode = await sock.requestPairingCode(
+                entry.phone
+            )
+        } catch {
+            await new Promise(resolve =>
+                setTimeout(resolve, 3000)
+            )
+
+            pairingCode = await sock.requestPairingCode(
+                entry.phone
+            )
+        }
+
+        return {
+            code:
+                String(pairingCode || '')
+                    .match(/.{1,4}/g)
+                    ?.join('-') ||
+                String(pairingCode || '')
+        }
     }
+
     return {}
 }
 
-async function startSerbot(phone, mainConn) {
+// ======================================================
+// 🚀 بدء البوت الفرعي
+// ======================================================
+
+async function startSerbot(phone, mainConn, installChat) {
     const existing = registry.get(phone)
-    if (existing?.sock) return { status: 'already' }
-    if (existing) return { status: 'already' } // كاين وكيتعاود الربط ديالو
-    if (registry.size >= MAX_SERBOTS) return { status: 'full' }
+
+    if (existing) {
+        return { status: 'already' }
+    }
+
+    if (registry.size >= MAX_SERBOTS) {
+        return { status: 'full' }
+    }
+
+    if (
+        !installChat ||
+        !installChat.endsWith('@g.us')
+    ) {
+        return { status: 'invalid_group' }
+    }
 
     const dir = path.join(BASE_DIR, phone)
+
     fs.mkdirSync(dir, { recursive: true })
-    const entry = { sock: null, phone, dir, startedAt: Date.now(), wasOpen: false, stopping: false, attempts: 0, timer: null, openNotified: false, registered: false }
+
+    const entry = {
+        sock: null,
+        phone,
+        dir,
+        installChat,
+        startedAt: Date.now(),
+        wasOpen: false,
+        stopping: false,
+        attempts: 0,
+        timer: null,
+        openNotified: false,
+        registered: false
+    }
+
     registry.set(phone, entry)
 
-    const res = await connectSocket(entry, mainConn)
-    if (res?.code) return { status: 'code', code: res.code }
-    return { status: 'reconnecting' }
+    try {
+        const res = await connectSocket(
+            entry,
+            mainConn
+        )
+
+        if (res?.code) {
+            return {
+                status: 'code',
+                code: res.code
+            }
+        }
+
+        return { status: 'reconnecting' }
+
+    } catch (e) {
+        registry.delete(phone)
+
+        try {
+            entry.sock?.end?.(undefined)
+        } catch {}
+
+        throw e
+    }
 }
 
-async function stopSerbot(phone, { logout = false } = {}) {
+// ======================================================
+// ⏹️ إيقاف أو حذف البوت الفرعي
+// ======================================================
+
+async function stopSerbot(phone, options = {}) {
+    const logout = options.logout === true
+
     const entry = registry.get(phone)
-    const dirExists = fs.existsSync(path.join(BASE_DIR, phone))
-    if (!entry && !dirExists) return false
+
+    const dir = path.join(BASE_DIR, phone)
+
+    if (!entry && !fs.existsSync(dir)) {
+        return false
+    }
+
     if (entry) {
         entry.stopping = true
-        if (entry.timer) clearTimeout(entry.timer)
-        try { if (logout) await entry.sock?.logout() } catch {}
-        try { entry.sock?.end?.(undefined) } catch {}
-        try { entry.sock?.ws?.close() } catch {}
+
+        if (entry.timer) {
+            clearTimeout(entry.timer)
+        }
+
+        try {
+            if (logout) {
+                await entry.sock?.logout()
+            }
+        } catch {}
+
+        try {
+            entry.sock?.end?.(undefined)
+            entry.sock?.ws?.close()
+        } catch {}
+
         registry.delete(phone)
     }
-    if (logout) fs.rmSync(path.join(BASE_DIR, phone), { recursive: true, force: true })
+
+    if (logout) {
+        fs.rmSync(
+            dir,
+            { recursive: true, force: true }
+        )
+    }
+
     return true
 }
 
-let handler = async (m, { conn, text, command, isOwner, usedPrefix }) => {
-    // ممنوع التنصيب من داخل بوت فرعي
-    if (conn?.isSerbot && ['serbot', 'jadibot'].includes(command)) {
-        return m.reply('🤖 هادا بوت فرعي ديجا — التنصيب كيكون غير من البوت الرئيسي SILANA.')
+// ======================================================
+// 🎯 MAIN HANDLER
+// ======================================================
+
+const handler = async (
+    m,
+    {
+        conn,
+        text,
+        command,
+        isOwner,
+        usedPrefix
+    }
+) => {
+
+    // منع التنصيب من بوت فرعي
+    if (conn?.isSerbot) {
+        return m.reply(
+            '⛔ التنصيب مسموح فقط من البوت الرئيسي DAMAR-MD.'
+        )
     }
 
-    if (command === 'blockserbot' || command === 'unblockserbot') {
-        if (!isOwner) return m.reply('⛔ هاد الأمر خاص بالمالك فقط.')
-        const arg = (text || '').trim()
-        const target = arg.includes('@g.us') ? arg : (m.chat?.endsWith('@g.us') ? m.chat : '')
-        if (!target) return m.reply(`⚠️ دير الأمر داخل الگروب المقصود، أو زيد الـ JID: ${usedPrefix + command} 120363XXXX@g.us`)
-        const list = blockedGroups()
-        if (command === 'blockserbot') {
-            if (list.includes(target)) return m.reply('ℹ️ هاد الگروب محظور على البوتات الفرعية ديجا.')
-            if (!saveBlockedGroups([...list, target])) return m.reply('❌ ما قدرتش نحفظ (قاعدة البيانات غير متاحة).')
-            return m.reply('🚫 تم: البوتات الفرعية ما غاديش تخدم فهاد الگروب (البوت الرئيسي بوحدو كافي).')
-        }
-        if (!list.includes(target)) return m.reply('ℹ️ هاد الگروب ماشي محظور على البوتات الفرعية.')
-        if (!saveBlockedGroups(list.filter((g) => g !== target))) return m.reply('❌ ما قدرتش نحفظ (قاعدة البيانات غير متاحة).')
-        return m.reply('✅ تم: البوتات الفرعية تقدر تخدم فهاد الگروب من جديد.')
-    }
+    // ==================================================
+    // 📋 لائحة البوتات
+    // ==================================================
 
     if (command === 'listbots') {
-        if (!isOwner) return m.reply('⛔ هاد الأمر خاص بالمالك فقط.')
-        if (!registry.size) return m.reply('📭 ما كاين حتى بوت فرعي متصل دابا.')
-        const list = [...registry.values()].map((e, i) => `${i + 1}. +${e.phone} — ${e.wasOpen ? '🟢 خدام' : '🟡 كيتربط'}`).join('\n')
-        return m.reply(`🤖 *البوتات الفرعية (${registry.size}/${MAX_SERBOTS}):*\n\n${list}`)
+        if (!isOwner) {
+            return m.reply('⛔ هذا الأمر خاص بالمالك.')
+        }
+
+        if (!registry.size) {
+            return m.reply('📭 لا توجد بوتات فرعية متصلة.')
+        }
+
+        const list = [...registry.values()]
+            .map((e, i) =>
+                `${i + 1}. +${e.phone} — ${e.wasOpen ? '🟢 خدام' : '🟡 كيتربط'}`
+            )
+            .join('\n')
+
+        return m.reply(
+            `🤖 *البوتات الفرعية (${registry.size}/${MAX_SERBOTS})*\n\n${list}`
+        )
+    }
+
+    // ==================================================
+    // 🚫 حظر مجموعة
+    // ==================================================
+
+    if (
+        command === 'blockserbot' ||
+        command === 'unblockserbot'
+    ) {
+        if (!isOwner) {
+            return m.reply('⛔ الأمر خاص بالمالك.')
+        }
+
+        const arg = (text || '').trim()
+
+        const target = arg.includes('@g.us')
+            ? arg
+            : m.chat?.endsWith('@g.us')
+                ? m.chat
+                : ''
+
+        if (!target) {
+            return m.reply(
+                '⚠️ استعمل الأمر داخل المجموعة أو أرسل JID.'
+            )
+        }
+
+        const list = blockedGroups()
+
+        if (command === 'blockserbot') {
+            if (list.includes(target)) {
+                return m.reply('ℹ️ المجموعة محظورة مسبقاً.')
+            }
+
+            if (!saveBlockedGroups([...list, target])) {
+                return m.reply('❌ تعذر حفظ الإعدادات.')
+            }
+
+            return m.reply(
+                '✅ تم حظر المجموعة من البوتات الفرعية.'
+            )
+        }
+
+        if (!list.includes(target)) {
+            return m.reply('ℹ️ المجموعة غير محظورة.')
+        }
+
+        if (!saveBlockedGroups(
+            list.filter(g => g !== target)
+        )) {
+            return m.reply('❌ تعذر حفظ الإعدادات.')
+        }
+
+        return m.reply('✅ تم إلغاء حظر المجموعة.')
+    }
+
+    // ==================================================
+    // 🗑️ حذف وإيقاف
+    // ==================================================
+
+    if (
+        command === 'delserbot' ||
+        command === 'stopserbot'
+    ) {
+        const phone = senderPhone(m, text)
+
+        if (!phone) {
+            return m.reply(
+                `⚠️ استعمل:\n${usedPrefix + command} 212XXXXXXXXX`
+            )
+        }
+
+        const done = await stopSerbot(
+            phone,
+            { logout: command === 'delserbot' }
+        )
+
+        if (!done) {
+            return m.reply('📭 لا يوجد بوت فرعي بهذا الرقم.')
+        }
+
+        return m.reply(
+            command === 'delserbot'
+                ? '🗑️ تم حذف الجلسة نهائياً.'
+                : '⏸️ تم إيقاف البوت الفرعي مع الاحتفاظ بالجلسة.'
+        )
+    }
+
+    // ==================================================
+    // 📱 أوامر التنصيب
+    // ==================================================
+
+    // التنصيب خاصو يكون داخل مجموعة
+    if (
+        !m.chat ||
+        !m.chat.endsWith('@g.us')
+    ) {
+        return m.reply(
+            '⚠️ خاصك تستعمل أمر التنصيب داخل المجموعة.\n\n' +
+            '📢 رسالة نجاح الربط غادي تتصيفط لنفس المجموعة.'
+        )
     }
 
     const phone = senderPhone(m, text)
 
-    if (command === 'delserbot' || command === 'stopserbot') {
-        if (!phone) return m.reply(`⚠️ ما عرفتش الرقم ديالك. جرب: ${usedPrefix + command} 2126XXXXXXXX`)
-        const done = await stopSerbot(phone, { logout: command === 'delserbot' })
-        if (!done) return m.reply('📭 ما عندك حتى بوت فرعي خدام بهاد الرقم.')
-        return m.reply(command === 'delserbot'
-            ? '🗑️ تم حذف البوت الفرعي نهائيا وتسجيل الخروج. تقدر تعاود `.serbot` فوقت ما بغيتي.'
-            : '⏸️ تم إيقاف البوت الفرعي. الجلسة محفوظة — عاود `.serbot` باش تشغلو بلا كود جديد.')
-    }
-
-    // serbot / jadibot
     if (!phone) {
         return m.reply(
-            '⚠️ *خاص الرقم صراحة:*\n' +
-            `${usedPrefix + command} 2126XXXXXXXX\n\n` +
-            '(رقم واتساب ديالك مع رمز الدولة، هو اللي غادي يولي بوت)')
-    }
-    if (phone === digits(conn?.user?.id)) {
-        return m.reply('😄 هادا هو رقم البوت الرئيسي نفسو — اختار رقم آخر.')
+            '⚠️ لم أستطع معرفة رقمك.\n\n' +
+            `استعمل:\n${usedPrefix + command} 212XXXXXXXXX\n\n` +
+            '📱 أرسل رقم حسابك مع رمز الدولة.'
+        )
     }
 
-    await m.react?.('🕓').catch(() => {})
+    if (phone === digits(conn?.user?.id)) {
+        return m.reply(
+            '😄 هذا رقم البوت الرئيسي. اختر رقم واتساب آخر تملكه.'
+        )
+    }
+
+    await m.react?.('⏳').catch(() => {})
+
     try {
-        const res = await startSerbot(phone, conn)
-        if (res.status === 'already') return m.reply('ℹ️ البوت الفرعي ديالك ديجا خدام ولا كيتربط. إلا تعطل، دير `.stopserbot` وعاود.')
-        if (res.status === 'full') return m.reply(`⚠️ وصلنا للحد الأقصى ديال البوتات الفرعية (${MAX_SERBOTS}). جرب من بعد.`)
-        if (res.status === 'code') {
+        // تمرير المجموعة مباشرة إلى نظام التنصيب
+        const res = await startSerbot(
+            phone,
+            conn,
+            m.chat
+        )
+
+        if (res.status === 'already') {
             return m.reply(
-                '🔗 *كود الربط ديالك:*\n\n' +
-                `*${res.code}*\n\n` +
-                'دخلو دابا فهاتف الرقم اللي بغيتي تنصبو:\n' +
-                'واتساب ← الأجهزة المرتبطة ← ربط جهاز ← *الربط برقم الهاتف* ← دخل الكود.\n\n' +
-                '⏳ الكود كيسالي بسرعة — دخلو مباشرة. ملي يتربط، غادي توصلك رسالة تأكيد.')
+                'ℹ️ هذا الرقم مربوط أو قيد الاتصال بالفعل.'
+            )
         }
+
+        if (res.status === 'full') {
+            return m.reply(
+                `⚠️ وصلنا للحد الأقصى (${MAX_SERBOTS}) من البوتات الفرعية.`
+            )
+        }
+
+        if (res.status === 'invalid_group') {
+            return m.reply(
+                '❌ تعذر تحديد مجموعة التنصيب.'
+            )
+        }
+
+        if (res.status === 'code') {
+            await sendPairingCard(
+                conn,
+                m,
+                res.code
+            )
+
+            await m.react?.('✅').catch(() => {})
+
+            return
+        }
+
         await m.react?.('✅').catch(() => {})
-        return m.reply('♻️ الجلسة ديالك محفوظة — كنعاود نربط البوت الفرعي بلا كود جديد. غادي توصلك رسالة ملي يولي خدام.')
+
+        return m.reply(
+            '♻️ الجلسة محفوظة، جاري إعادة الاتصال.'
+        )
+
     } catch (e) {
-        console.error('[SERBOT] start failed:', e)
+        console.error('[DAMAR JADIBOT ERROR]', e)
+
         registry.delete(phone)
-        return m.reply('❌ فشل بدء التنصيب. عاود المحاولة من بعد.' + (isOwner ? `\n\n🔧 تفاصيل للمالك: ${String(e?.message || e).slice(0, 150)}` : ''))
+
+        await m.react?.('❌').catch(() => {})
+
+        return m.reply(
+            '❌ وقع مشكل أثناء التنصيب.\n' +
+            'تأكد من اتصال الإنترنت وحاول مرة أخرى.\n\n' +
+            (
+                isOwner
+                    ? 'التفاصيل: ' + String(e?.message || e).slice(0, 200)
+                    : ''
+            )
+        )
     }
 }
 
-handler.help = handler.command = ['serbot', 'jadibot', 'delserbot', 'stopserbot', 'listbots', 'blockserbot', 'unblockserbot']
-handler.tags = ['owner']
+// ======================================================
+// ⚙️ COMMANDS
+// ======================================================
+
+handler.help = [
+    'تنصيب',
+    'Code',
+    'Jadibot',
+    'serbot',
+    'jadibot',
+    'stopserbot',
+    'delserbot',
+    'listbots',
+    'blockserbot',
+    'unblockserbot'
+]
+
+handler.tags = ['main', 'owner']
+
+handler.command =
+    /^(تنصيب|code|jadibot|serbot|stopserbot|delserbot|listbots|blockserbot|unblockserbot)$/i
+
 handler.limit = false
+handler.owner = false
+
 export default handler
